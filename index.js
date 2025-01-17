@@ -37,10 +37,10 @@ const document = dom.window.document;
 
 // Cấu hình Azure SQL Database
 const dbConfig = {
-  user: "puugoo", // Tên đăng nhập vào Azure SQL Database
-  password: "1303Puu!", // Mật khẩu đăng nhập vào Azure SQL Database
-  server: "digi-hotel.database.windows.net", // Tên máy chủ của Azure SQL Database
-  database: "hotel", // Tên cơ sở dữ liệu cần kết nối
+  user: process.env.DB_USER, // Tên đăng nhập vào Azure SQL Database
+  password: process.env.DB_PASSWORD, // Mật khẩu đăng nhập vào Azure SQL Database
+  server: process.env.DB_SERVER, // Tên máy chủ của Azure SQL Database
+  database: process.env.DB_NAME, // Tên cơ sở dữ liệu cần kết nối
   option: {
     encrypt: true, // Yêu cầu mã hóa kết nối (SSL) khi kết nối tới Azure SQL Database
     trustServerCertificate: false, // Không tin cậy chứng chỉ của máy chủ nếu không sử dụng chứng chỉ SSL đáng tin cậy
