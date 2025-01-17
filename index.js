@@ -51,19 +51,6 @@ const dbConfig = {
 // Kết nối đến Azure SQL Database
 let pool; // Khai báo biến pool để quản lý kết nối cơ sở dữ liệu, giúp tái sử dụng kết nối
 
-app.use(async (req, res, next) => {
-  if (!pool) {
-    console.error("Chưa khởi tạo kết nối với Azure SQL Database");
-    try {
-      await connectToDatabase(); // Kết nối lại
-    } catch (error) {
-      console.error("Lỗi khi kết nối cơ sở dữ liệu:", error.message);
-      return res.status(500).send("Không thể kết nối tới cơ sở dữ liệu.");
-    }
-  }
-  next();
-});
-
 
 // Hàm kết nối tới Azure SQL Database
 async function connectToDatabase() {
@@ -75,7 +62,7 @@ async function connectToDatabase() {
   }
 }
 
-connectToDatabase(); // Gọi hàm kết nối đến cơ sở dữ liệu
+await connectToDatabase(); // Gọi hàm kết nối đến cơ sở dữ liệu
 
 
 // Middleware to check if the user is logged in
