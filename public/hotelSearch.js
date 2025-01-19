@@ -92,6 +92,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   });
                 }
               }
+              console.log(resultsFromBingArray);
               const maxPercentageResult = resultsFromBingArray.reduce(
                 (max, item) => {
                   return item.percentage > max.percentage ? item : max;
@@ -99,6 +100,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 { percentage: -Infinity }
               );
               matchedLink = maxPercentageResult.matchedLink;
+              console.log(matchedLink);
             }
           } catch (error) {
             console.log("Lỗi khi tìm kiếm:", error);
