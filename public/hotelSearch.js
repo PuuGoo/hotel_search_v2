@@ -73,16 +73,15 @@ document.addEventListener("DOMContentLoaded", function () {
             console.log(response);
 
             // Lấy kết quả từ Bing API
-            let resultsFromBing = response.data.webPages.value;
+            const resultsFromBing = response.data.webPages.value;
 
-            if (resultsFromBing && resultsFromBing.length > 0) {
-              const resultsFromBingArray = [];
+if (resultsFromBing && resultsFromBing.length > 0) {
+              let resultsFromBingArray = [];
               // Lặp qua các kết quả tìm kiếm từ Bing
               for (let result of resultsFromBing) {
                 const pageTitle = result.name.toLowerCase(); // Tiêu đề của trang
                 // const pageSnippet = result.snippet.toLowerCase(); // Mô tả ngắn gọn của trang
                 const pageUrl = result.url;
-
                 // So sánh tên khách sạn với tiêu đề của trang web
                 const isMatch = isHotelNameInPage(hotelNameArray, pageTitle);
                 if (isMatch.status) {
@@ -92,7 +91,6 @@ document.addEventListener("DOMContentLoaded", function () {
                   });
                 }
               }
-              console.log(resultsFromBingArray);
               const maxPercentageResult = resultsFromBingArray.reduce(
                 (max, item) => {
                   return item.percentage > max.percentage ? item : max;
@@ -101,10 +99,11 @@ document.addEventListener("DOMContentLoaded", function () {
               );
               // matchedLink = maxPercentageResult.matchedLink;
               resultsFromBingArray = resultsFromBingArray.filter((row) => row.percentage == maxPercentageResult.percentage);
-              resultsFromBingArray = resultsFromBingArray.filter((row) => !row.matchedLink.includes("tripadvisor"));
+              resultsFromBingArray =resultsFromBingArray.filter((row) => !row.matchedLink.includes("tripadvisor"));
+    
             matchedLink = resultsFromBingArray.map(({percentage, ...rest}) => rest['matchedLink']);
-        console.log(matchedLink);
-            }
+    console.log(matchedLink);
+            };
           } catch (error) {
             console.log("Lỗi khi tìm kiếm:", error);
           }
