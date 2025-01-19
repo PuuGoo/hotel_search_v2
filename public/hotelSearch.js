@@ -61,7 +61,7 @@ document.addEventListener("DOMContentLoaded", function () {
             query
           )}&textDecorations=true&textFormat=HTML`;
 
-          let matchedLink = "Không tìm thấy link"; // Giá trị mặc định khi không tìm thấy link
+          let matchedLink = [] | "Không tìm thấy link"; // Giá trị mặc định khi không tìm thấy link
 
           // Thực hiện tìm kiếm qua Algolia
           try {
@@ -99,9 +99,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 },
                 { percentage: -Infinity }
               );
-              matchedLink = maxPercentageResult.matchedLink;
+              // matchedLink = maxPercentageResult.matchedLink;
               resultsFromBingArray.filter((row) => row.percentage == maxPercentageResult.percentage);
                 console.log(resultsFromBingArray);
+              matchedLink = [...resultsFromBingArray.pageUrl];
             }
           } catch (error) {
             console.log("Lỗi khi tìm kiếm:", error);
