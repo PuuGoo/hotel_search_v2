@@ -100,7 +100,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 { percentage: -Infinity }
               );
               matchedLink = maxPercentageResult.matchedLink;
-              console.log(matchedLink);
+              resultsFromBingArray.filter((row) => row.percentage == maxPercentageResult.percentage);
+                console.log(resultsFromBingArray);
             }
           } catch (error) {
             console.log("Lỗi khi tìm kiếm:", error);
