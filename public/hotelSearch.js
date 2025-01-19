@@ -113,7 +113,7 @@ if (resultsFromBing && resultsFromBing.length > 0) {
             order: order++, // Tăng số thứ tự
             hotelName,
             hotelAddress,
-            matchedLink: [...matchedLink],
+            matchedLinks: [...matchedLink],
           });
         }
 
@@ -134,15 +134,30 @@ if (resultsFromBing && resultsFromBing.length > 0) {
 
 // Hàm xuất ra file CSV
 function downloadCSV(results) {
-  // Tạo nội dung cho file CSV, với dòng đầu là tiêu đề, và các dòng còn lại là nội dung
-  const csvContent =
-    "Order, Hotel Name, Hotel Address, Matched Link\n" +
-    results
-      .map(
-        (row) =>
-          `"${row.order}","${row.hotelName}","${row.hotelAddress}","${row.matchedLink}"`
-      )
-      .join("\n");
+// Tìm số lượng cột tối đa cho matchedLinks
+const maxMatchedLinks = Math.max(
+  ...results.map((row) => row.matchedLinks.length)
+);
+
+// Tạo tiêu đề CSV với các cột MatchedLink1, MatchedLink2, ..., MatchedLinkN
+const header =
+  "Order,Hotel Name,Hotel Address," +
+  Array.from({ length: maxMatchedLinks }, (_, i) => `Matched Link ${i + 1}`).join(",") +
+  "\n";
+
+// Tạo nội dung CSV
+const csvContent =
+  header +
+  results
+    .map((row) => {
+      // Ghép thông tin cơ bản và matchedLinks, bổ sung cột trống nếu thiếu liên kết
+      const links = row.matchedLinks.map((link) => `"${link}"`);
+      while (links.length < maxMatchedLinks) {
+        links.push('""'); // Thêm cột trống nếu thiếu
+      }
+      return `"${row.order}","${row.hotelName}","${row.hotelAddress}",${links.join(",")}`;
+    })
+    .join("\n");
   // Tạo file blob
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
   // Tạo một liên kết ẩn để tải file
