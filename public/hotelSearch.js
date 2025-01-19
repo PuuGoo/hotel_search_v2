@@ -113,7 +113,7 @@ if (resultsFromBing && resultsFromBing.length > 0) {
             order: order++, // Tăng số thứ tự
             hotelName,
             hotelAddress,
-            matchedLink,
+            matchedLink: [...matchedLink],
           });
         }
 
