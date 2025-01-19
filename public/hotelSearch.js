@@ -107,7 +107,6 @@ if (resultsFromBing && resultsFromBing.length > 0) {
           } catch (error) {
             console.log("Lỗi khi tìm kiếm:", error);
           }
-          console.log(matchedLink);
 
           // Thêm số thứ tự vào kết quả , nếu không có link thì vẫn trả về kết quả với chữ "Không tìm thấy link"
           results.push({
