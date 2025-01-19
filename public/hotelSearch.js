@@ -115,7 +115,7 @@ document.addEventListener("DOMContentLoaded", function () {
             order: order++, // Tăng số thứ tự
             hotelName,
             hotelAddress,
-            ...matchedLink,
+            matchedLink,
           });
         }
 
