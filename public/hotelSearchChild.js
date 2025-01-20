@@ -182,7 +182,7 @@ function downloadCSV(results) {
         while (links.length < maxMatchedLinks) {
           links.push('""'); // Thêm cột trống nếu thiếu
         }
-        return `"${row.order}","${row.hotelNo}", Child,${row.hotelName}","${
+        return `"${row.order}","${row.hotelNo}", Child,"${row.hotelName}","${
           row.hotelAddress
         }",${links.join(",")}`;
       })
