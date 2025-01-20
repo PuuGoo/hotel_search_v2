@@ -47,10 +47,8 @@ const dbConfig = {
   },
 };
 
-
 // Kết nối đến Azure SQL Database
 let pool; // Khai báo biến pool để quản lý kết nối cơ sở dữ liệu, giúp tái sử dụng kết nối
-
 
 // Hàm kết nối tới Azure SQL Database
 async function connectToDatabase() {
@@ -63,7 +61,6 @@ async function connectToDatabase() {
 }
 
 await connectToDatabase(); // Gọi hàm kết nối đến cơ sở dữ liệu
-
 
 // Middleware to check if the user is logged in
 function checkAuthenticated(req, res, next) {
@@ -79,8 +76,11 @@ function checkAuthenticated(req, res, next) {
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "login.html"));
 });
-app.get("/hotelSearch", checkAuthenticated, (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "hotelSearch.html"));
+app.get("/AZURE_CHILD", checkAuthenticated, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "hotelSearchChild.html"));
+});
+app.get("/AZURE_MASTER", checkAuthenticated, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "hotelSearchMaster.html"));
 });
 
 // Xử lý yêu cầu đăng nhập
@@ -100,7 +100,7 @@ app.post("/login", async (req, res) => {
     // Nếu tìm thấy người dùng trong cơ sở dữ liệu
     if (result.recordset.length > 0) {
       req.session.isAuthenticated = true; // Mark user as authenticated
-      res.redirect("/hotelSearch");
+      res.redirect("/AZURE_CHILD");
     } else {
       res.status(401).send("Sai tên đăng nhập hoặc mật khẩu");
     }

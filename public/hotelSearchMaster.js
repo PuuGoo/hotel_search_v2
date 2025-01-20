@@ -17,7 +17,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
       // Cài đặt một số thông số từ BING SEARCH
       const subscriptionKey = document.getElementById("subscriptionKey").value;
-      console.log(subscriptionKey);
 
       const endpoint = "https://api.bing.microsoft.com/v7.0/search";
 
@@ -36,7 +35,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // Duyệt qua từng dòng trong file Excel
         for (let row of jsonData) {
-          let [hotelName, hotelAddress] = row; // Phá hủy một mãng
+          let [hotelNo, hotelName, hotelAddress] = row; // Phá hủy một mãng
           // Nếu dòng dữ liệu trống thì bỏ qua không xử lý
           if (!hotelName || !hotelAddress) {
             continue;
@@ -61,7 +60,7 @@ document.addEventListener("DOMContentLoaded", function () {
             query
           )}&textDecorations=true&textFormat=HTML`;
 
-          let matchedLink = "Không tìm thấy link"; // Giá trị mặc định khi không tìm thấy link
+          let matchedLink = []; // Giá trị mặc định khi không tìm thấy link
 
           // Thực hiện tìm kiếm qua Algolia
           try {
@@ -75,7 +74,7 @@ document.addEventListener("DOMContentLoaded", function () {
             // Lấy kết quả từ Bing API
             const resultsFromBing = response.data.webPages.value;
 
-if (resultsFromBing && resultsFromBing.length > 0) {
+            if (resultsFromBing && resultsFromBing.length > 0) {
               let resultsFromBingArray = [];
               // Lặp qua các kết quả tìm kiếm từ Bing
               for (let result of resultsFromBing) {
@@ -91,19 +90,46 @@ if (resultsFromBing && resultsFromBing.length > 0) {
                   });
                 }
               }
+              console.log("resultsFromBingArray: ", resultsFromBingArray);
               const maxPercentageResult = resultsFromBingArray.reduce(
                 (max, item) => {
                   return item.percentage > max.percentage ? item : max;
                 },
                 { percentage: -Infinity }
               );
+              console.log("maxPercentageResult: ", maxPercentageResult);
+
               // matchedLink = maxPercentageResult.matchedLink;
-              resultsFromBingArray = resultsFromBingArray.filter((row) => row.percentage == maxPercentageResult.percentage);
-              resultsFromBingArray =resultsFromBingArray.filter((row) => !row.matchedLink.includes("tripadvisor"));
-    
-            matchedLink = resultsFromBingArray.map(({percentage, ...rest}) => rest['matchedLink']);
-    console.log(matchedLink);
-            };
+              resultsFromBingArray = resultsFromBingArray
+                .filter(
+                  (row) =>
+                    row.percentage == maxPercentageResult.percentage &&
+                    !row.matchedLink.includes("tripadvisor")
+                )
+                .sort((a, b) => {
+                  if (
+                    a.matchedLink.includes("agoda") &&
+                    !b.matchedLink.includes("agoda")
+                  )
+                    return -1; // Ưu tiên link a
+                  if (
+                    !a.matchedLink.includes("agoda") &&
+                    b.matchedLink.includes("agoda")
+                  )
+                    return 1; // Ưu tiên link b
+                  return 0; // Giữ nguyên thứ tự link
+                });
+
+              console.log(
+                "Những Link không phải trang Tripadvisor: ",
+                resultsFromBingArray
+              );
+
+              matchedLink = resultsFromBingArray.map(
+                ({ percentage, ...rest }) => rest["matchedLink"]
+              );
+              console.log(matchedLink);
+            }
           } catch (error) {
             console.log("Lỗi khi tìm kiếm:", error);
           }
@@ -111,6 +137,7 @@ if (resultsFromBing && resultsFromBing.length > 0) {
           // Thêm số thứ tự vào kết quả , nếu không có link thì vẫn trả về kết quả với chữ "Không tìm thấy link"
           results.push({
             order: order++, // Tăng số thứ tự
+            hotelNo,
             hotelName,
             hotelAddress,
             matchedLinks: [...matchedLink],
@@ -127,37 +154,39 @@ if (resultsFromBing && resultsFromBing.length > 0) {
 
       reader.readAsArrayBuffer(file);
     });
-  document.getElementById("logoutButton").addEventListener("click", () => {
-    window.location.href = "/logout"; // Điều hướng người dùng về trang đăng nhập
-  });
 });
 
 // Hàm xuất ra file CSV
 function downloadCSV(results) {
-// Tìm số lượng cột tối đa cho matchedLinks
-const maxMatchedLinks = Math.max(
-  ...results.map((row) => row.matchedLinks.length)
-);
+  // Tìm số lượng cột tối đa cho matchedLinks
+  const maxMatchedLinks = Math.max(
+    ...results.map((row) => row.matchedLinks.length)
+  );
 
-// Tạo tiêu đề CSV với các cột MatchedLink1, MatchedLink2, ..., MatchedLinkN
-const header =
-  "Order,Hotel Name,Hotel Address," +
-  Array.from({ length: maxMatchedLinks }, (_, i) => `Matched Link ${i + 1}`).join(",") +
-  "\n";
+  // Tạo tiêu đề CSV với các cột MatchedLink1, MatchedLink2, ..., MatchedLinkN
+  const header =
+    "Order,No, Type, Hotel Name,Hotel Address," +
+    Array.from(
+      { length: maxMatchedLinks },
+      (_, i) => `Matched Link ${i + 1}`
+    ).join(",") +
+    "\n";
 
-// Tạo nội dung CSV
-const csvContent =
-  header +
-  results
-    .map((row) => {
-      // Ghép thông tin cơ bản và matchedLinks, bổ sung cột trống nếu thiếu liên kết
-      const links = row.matchedLinks.map((link) => `"${link}"`);
-      while (links.length < maxMatchedLinks) {
-        links.push('""'); // Thêm cột trống nếu thiếu
-      }
-      return `"${row.order}","${row.hotelName}","${row.hotelAddress}",${links.join(",")}`;
-    })
-    .join("\n");
+  // Tạo nội dung CSV
+  const csvContent =
+    header +
+    results
+      .map((row) => {
+        // Ghép thông tin cơ bản và matchedLinks, bổ sung cột trống nếu thiếu liên kết
+        const links = row.matchedLinks.map((link) => `"${link}"`);
+        while (links.length < maxMatchedLinks) {
+          links.push('""'); // Thêm cột trống nếu thiếu
+        }
+        return `"${row.order}","${row.hotelNo}", Master,${row.hotelName}","${
+          row.hotelAddress
+        }",${links.join(",")}`;
+      })
+      .join("\n");
   // Tạo file blob
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
   // Tạo một liên kết ẩn để tải file
@@ -185,10 +214,43 @@ function isHotelNameInPage(hotelNameArray, pageTitle, pageSnippet) {
 
   // Kiểm tra nếu số phần tử khớp >= 50% tổng số phần tử trong hotelNameArray
   const matchPercentage = (matchCount / hotelNameArray.length) * 100;
-  if (matchPercentage >= 50) {
-    return {
-      status: true,
-      percentage: matchPercentage,
-    };
-  }
+
+  return {
+    status: true,
+    percentage: matchPercentage,
+  };
 }
+
+// Cấu hình các trang và các nút liên quan
+const pages = {
+  AZURE_CHILD: ["AZURE_MASTER"],
+  AZURE_MASTER: ["AZURE_CHILD"],
+};
+
+// Hàm thay đổi nội dung và hiển thị nút
+function switchPage(page) {
+  // Cập nhật tiêu đề trang
+  document.querySelector("h1").textContent = `Chức năng ${page}`;
+
+  // Ẩn tất cả các trang
+  document.querySelectorAll(".page").forEach((p) => (p.style.display = "none"));
+
+  // Hiển thị trang hiện tại
+  document.getElementById(`page${page}`).style.display = "block";
+
+  // Cập nhật các nút chức năng
+  const buttonContainer = document.querySelector(".button-container");
+  buttonContainer.innerHTML = ""; // Xóa các nút hiện tại
+  pages[page].forEach((p) => {
+    const a = document.createElement("a");
+    a.href = p;
+    const button = document.createElement("button");
+    button.textContent = `Chức năng ${p}`;
+    button.onclick = () => switchPage(p);
+    a.appendChild(button);
+    buttonContainer.appendChild(a);
+  });
+}
+
+// Khởi tạo mặc định là trang A
+switchPage("AZURE_MASTER");
