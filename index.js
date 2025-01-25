@@ -9,6 +9,7 @@ import { dirname } from "path"; // Import dirname
 import path from "path";
 import session from "express-session"; // To manage sessions
 import dotenv from "dotenv"; // To manage sessions
+import cors from "cors";
 dotenv.config();
 
 // Get the directory name from import.meta.url
@@ -29,6 +30,17 @@ app.use(
     cookie: { secure: false }, // 'secure: false' for non-HTTPS environments
   })
 );
+app.use(cors());
+// Thêm middleware để cho phép tất cả các miền (CORS)
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*"); // Cho phép tất cả các miền
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Subscription-Token"
+  );
+  next();
+});
 
 const dom = new JSDOM(
   `<!DOCTYPE html><html><body><button id="searchButton">Search</button></body></html>`
@@ -79,7 +91,7 @@ app.get("/", (req, res) => {
 app.get("/AZURE_CHILD", checkAuthenticated, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "hotelSearchChild.html"));
 });
-app.get("/AZURE_MASTER", checkAuthenticated, (req, res) => {
+app.get("/AZURE_MASTER", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "hotelSearchMaster.html"));
 });
 
