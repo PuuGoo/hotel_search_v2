@@ -23,12 +23,15 @@ document.addEventListener("DOMContentLoaded", function () {
         const workbook = XLSX.read(data, { type: "array" });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
+        let jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        jsonData = jsonData.filter((row) =>
+          row.some((cell) => cell !== undefined && cell !== null && cell !== "")
+        );
         jsonData.shift();
-
-        const results = [];
+        console.log(jsonData.length);
+        let results = [];
         let order = 1;
+        let currentIndex = 0;
 
         for (let row of jsonData) {
           let [hotelNo, hotelName, hotelAddress] = row;
@@ -45,92 +48,67 @@ document.addEventListener("DOMContentLoaded", function () {
                 .toLowerCase()
             );
 
-          const query = `${hotelName} ${hotelAddress}`; // Điều kiện tìm kiếm
-          const searchURL = `https://cors-anywhere-7jt3.onrender.com/${endpoint}?q=${encodeURIComponent(
+          const query = `${hotelName} ${hotelAddress}`;
+          const searchURL = `https://cors-anywhere-7jt3.onrender.com/https://api.crawlbase.com/?token=${subscriptionKey}&url=https://www.google.com/search?q=${encodeURIComponent(
             query
-          )}&textDecorations=true&textFormat=HTML`;
+          )}`;
 
           let matchedLink = [];
-
           try {
-            // Thay thế axios bằng fetch và sử dụng Brave API
             const response = await fetch(searchURL, {
               method: "GET",
               headers: {
                 Accept: "application/json",
-                "Accept-Encoding": "gzip",
-                "X-Subscription-Token": subscriptionKey, // Sử dụng Bearer token cho Brave API,
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization",
-                "Access-Control-Allow-Credentials": true,
               },
             });
-            console.log(response);
+            const text = await response.text();
 
-            const data = await response.json();
-            console.log(data);
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, "text/html");
+            const searchResults = doc.querySelectorAll("a");
 
-            // Lấy kết quả từ Brave Search API
-            const resultsFromBrave = data.web.results;
+            searchResults.forEach((result) => {
+              const link = result.href;
 
-            if (resultsFromBrave && resultsFromBrave.length > 0) {
-              let resultsFromBraveArray = [];
-              for (let result of resultsFromBrave) {
-                const pageTitle = result.title.toLowerCase();
-                const pageUrl = result.url;
-                const isMatch = isHotelNameInPage(hotelNameArray, pageTitle);
-
-                if (isMatch.status) {
-                  resultsFromBraveArray.push({
-                    percentage: isMatch.percentage,
-                    matchedLink: pageUrl,
-                  });
+              if (
+                result.innerText.toLowerCase().includes(hotelName.toLowerCase())
+              ) {
+                if (link.includes("?q=")) {
+                  const queryPart = link.split("?q=")[1];
+                  if (queryPart.includes("&")) {
+                    const finalLink = queryPart.split("&")[0];
+                    matchedLink.push(finalLink);
+                  }
                 }
               }
-
-              const maxPercentageResult = resultsFromBraveArray.reduce(
-                (max, item) => {
-                  return item.percentage > max.percentage ? item : max;
-                },
-                { percentage: -Infinity }
-              );
-
-              resultsFromBraveArray = resultsFromBraveArray
-                .filter(
-                  (row) =>
-                    row.percentage == maxPercentageResult.percentage &&
-                    !row.matchedLink.includes("tripadvisor")
-                )
-                .sort((a, b) => {
-                  if (
-                    a.matchedLink.includes("agoda") &&
-                    !b.matchedLink.includes("agoda")
-                  )
-                    return -1;
-                  if (
-                    !a.matchedLink.includes("agoda") &&
-                    b.matchedLink.includes("agoda")
-                  )
-                    return 1;
-                  return 0;
-                });
-
-              matchedLink = resultsFromBraveArray.map(
-                ({ percentage, ...rest }) => rest["matchedLink"]
-              );
-            }
+            });
           } catch (error) {
-            console.log("Lỗi khi tìm kiếm:", error);
-          }
+            console.error("Error searching:", error);
+          } finally {
+            matchedLink = matchedLink
+              .filter((e) => e.includes("http") && !e.includes("tripadvisor"))
+              .sort((a, b) => {
+                if (a.includes("agoda") && !b.includes("agoda")) return -1; // Ưu tiên link a
+                if (!a.includes("agoda") && b.includes("agoda")) return 1; // Ưu tiên link b
+                return 0; // Giữ nguyên thứ tự link
+              });
+            results.push({
+              order: order++,
+              hotelNo,
+              hotelName,
+              hotelAddress,
+              matchedLinks: [...matchedLink],
+            });
+            currentIndex++;
+            console.log("Dong thu:", currentIndex);
 
-          results.push({
-            order: order++,
-            hotelNo,
-            hotelName,
-            hotelAddress,
-            matchedLinks: [...matchedLink],
-          });
+            // Wait for the delay before sending the next request
+            // if (currentIndex < maxRequestsPerWindow) {
+            //   console.log("Dong thu:", order);
+
+            //   await delayRequest(delayBetweenRequests); // Add delay between requests
+            // }
+          }
         }
 
         if (results.length > 0) {
@@ -234,4 +212,4 @@ function switchPage(page) {
 }
 
 // Khởi tạo mặc định là trang A
-switchPage("AZURE_MASTER");
+switchPage("CRAWLBASE_MASTER");
