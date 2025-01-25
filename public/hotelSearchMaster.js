@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const reader = new FileReader();
 
       // const subscriptionKey = document.getElementById("subscriptionKey").value;
-      const subscriptionKey = "BSACjTF0z775aTu2a7O4XbDo2N8Ta-7";
+      const subscriptionKey = document.getElementById("subscriptionKey").value;
 
       // Cập nhật endpoint cho Brave Search API
       const endpoint = "https://api.search.brave.com/res/v1/web/search";
@@ -45,8 +45,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 .toLowerCase()
             );
 
-          const query = `${hotelName} ${hotelAddress}`;
-          const searchURL = `${endpoint}?q=${encodeURIComponent(query)}`;
+          const query = `${hotelName} ${hotelAddress}`; // Điều kiện tìm kiếm
+          const searchURL = `https://cors-anywhere.herokuapp.com/${endpoint}?q=${encodeURIComponent(
+            query
+          )}&textDecorations=true&textFormat=HTML`;
 
           let matchedLink = [];
 
@@ -55,21 +57,27 @@ document.addEventListener("DOMContentLoaded", function () {
             const response = await fetch(searchURL, {
               method: "GET",
               headers: {
-                "Access-Control-Allow-Origin": "*",
+                Accept: "application/json",
+                "Accept-Encoding": "gzip",
                 "X-Subscription-Token": subscriptionKey, // Sử dụng Bearer token cho Brave API,
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization",
+                "Access-Control-Allow-Credentials": true,
               },
             });
+            console.log(response);
 
             const data = await response.json();
             console.log(data);
 
             // Lấy kết quả từ Brave Search API
-            const resultsFromBrave = data.webPages.value;
+            const resultsFromBrave = data.web.results;
 
             if (resultsFromBrave && resultsFromBrave.length > 0) {
               let resultsFromBraveArray = [];
               for (let result of resultsFromBrave) {
-                const pageTitle = result.name.toLowerCase();
+                const pageTitle = result.title.toLowerCase();
                 const pageUrl = result.url;
                 const isMatch = isHotelNameInPage(hotelNameArray, pageTitle);
 
