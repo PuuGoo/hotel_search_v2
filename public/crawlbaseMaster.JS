@@ -197,7 +197,7 @@ function switchPage(page) {
   // Hiển thị trang hiện tại
   document.getElementById(`page${page}`).style.display = "block";
 
-  // Cập nhật các nút chức năng
+  // Cập nhật các nút chức năng cho trang
   const buttonContainer = document.querySelector(".button-container");
   buttonContainer.innerHTML = ""; // Xóa các nút hiện tại
   pages[page].forEach((p) => {
