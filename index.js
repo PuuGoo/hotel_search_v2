@@ -80,12 +80,10 @@ app.get("/AZURE_CHILD", checkAuthenticated, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "hotelSearchChild.html"));
 });
 app.get("/BRAVE_MASTER", (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
   res.sendFile(path.join(__dirname, "public", "hotelSearchMaster.html"));
 });
 app.get("/CRAWLBASE_MASTER", (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.sendFile(path.join(__dirname, "public", "CRAWLBASE_MASTER.html"));
+  res.sendFile(path.join(__dirname, "public", "crawlbaseMaster.html"));
 });
 
 // Xử lý yêu cầu đăng nhập
