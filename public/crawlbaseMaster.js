@@ -111,16 +111,24 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         }
 
-        if (results.length > 0) {
-          downloadCSV(results);
-        } else {
-          alert("Không tìm thấy kết quả nào khớp với tên khách sạn.");
-        }
+if (results.length > 0) {
+  setupDownloadButton(results); // Hiển thị nút tải khi có kết quả
+} else {
+  alert("Không tìm thấy kết quả nào khớp với tên khách sạn.");
+}
+
       };
 
       reader.readAsArrayBuffer(file);
     });
 });
+
+// Thêm nút tải xuống CSV sau khi có dữ liệu
+function setupDownloadButton(results) {
+  const downloadButton = document.getElementById("downloadCSVButton");
+  downloadButton.style.display = "block"; // Hiển thị nút
+  downloadButton.onclick = () => downloadCSV(results); // Khi nhấn mới tải
+}
 
 // Hàm xuất ra file CSV
 function downloadCSV(results) {
