@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const workbook = XLSX.read(data, { type: "array" });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        let jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
         jsonData = jsonData.filter((row) =>
           row.some((cell) => cell !== undefined && cell !== null && cell !== "")
         );

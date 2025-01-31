@@ -26,7 +26,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const workbook = XLSX.read(data, { type: "array" }); // Đọc toàn bộ file Excel
         const sheetName = workbook.SheetNames[0]; // Lấy tên của sheet đầu tiên trong file Excel
         const sheet = workbook.Sheets[sheetName]; // Đọc dữ liệu của sheet đầu tiên trong file Excel
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }); // Theo mặc định sheet_to_json sẽ lấy dòng đầu tiên và sự dụng giá trị như key cho tất cả các dòng còn lại giống mãng kết hợp. Nếu lựa chọn thuộc tính {header: 1} thì nó sẽ xuất thành một mãng các giá trị theo từng dòng file Excel.
+        let jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }); // Theo mặc định sheet_to_json sẽ lấy dòng đầu tiên và sự dụng giá trị như key cho tất cả các dòng còn lại giống mãng kết hợp. Nếu lựa chọn thuộc tính {header: 1} thì nó sẽ xuất thành một mãng các giá trị theo từng dòng file Excel.
         jsonData = jsonData.filter((row) =>
           row.some((cell) => cell !== undefined && cell !== null && cell !== "")
         );
