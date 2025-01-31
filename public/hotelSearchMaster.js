@@ -24,12 +24,14 @@ document.addEventListener("DOMContentLoaded", function () {
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
+        jsonData = jsonData.filter((row) =>
+          row.some((cell) => cell !== undefined && cell !== null && cell !== "")
+        );
         jsonData.shift();
-
+        console.log(jsonData.length);
         const results = [];
         let order = 1;
-
+        let currentIndex = 0;
         for (let row of jsonData) {
           let [hotelNo, hotelName, hotelAddress] = row;
           if (!hotelName || !hotelAddress) continue;
@@ -66,10 +68,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 "Access-Control-Allow-Credentials": true,
               },
             });
-            console.log(response);
+            // console.log(response);
 
             const data = await response.json();
-            console.log(data);
+            // console.log(data);
 
             // Lấy kết quả từ Brave Search API
             const resultsFromBrave = data.web.results;
@@ -131,6 +133,8 @@ document.addEventListener("DOMContentLoaded", function () {
             hotelAddress,
             matchedLinks: [...matchedLink],
           });
+          currentIndex++;
+          console.log("Dong thu:", currentIndex);
         }
 
         if (results.length > 0) {

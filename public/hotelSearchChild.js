@@ -27,12 +27,14 @@ document.addEventListener("DOMContentLoaded", function () {
         const sheetName = workbook.SheetNames[0]; // Lấy tên của sheet đầu tiên trong file Excel
         const sheet = workbook.Sheets[sheetName]; // Đọc dữ liệu của sheet đầu tiên trong file Excel
         const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }); // Theo mặc định sheet_to_json sẽ lấy dòng đầu tiên và sự dụng giá trị như key cho tất cả các dòng còn lại giống mãng kết hợp. Nếu lựa chọn thuộc tính {header: 1} thì nó sẽ xuất thành một mãng các giá trị theo từng dòng file Excel.
-
+        jsonData = jsonData.filter((row) =>
+          row.some((cell) => cell !== undefined && cell !== null && cell !== "")
+        );
         jsonData.shift(); // Bỏ dòng tiêu đề tức dòng đầu tiên
-
+        console.log(jsonData.length);
         const results = []; // Tạo một mãng lưu trữ kết quả tìm kiếm được
         let order = 1; // Biến lưu số thứ tự khách sạn từ file
-
+        let currentIndex = 0;
         // Duyệt qua từng dòng trong file Excel
         for (let row of jsonData) {
           let [hotelNo, hotelName, hotelAddress] = row; // Phá hủy một mãng
@@ -50,7 +52,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 .replace(")", "")
                 .toLowerCase()
             );
-          console.log(hotelNameArray);
+          // console.log(hotelNameArray);
 
           const query = `${hotelName} ${hotelAddress}`; // Điều kiện tìm kiếm
           // const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(
@@ -69,7 +71,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 "Ocp-Apim-Subscription-Key": subscriptionKey, // Thêm API Key vào header, và Ocp-Apim-Subscription-Key: là tham số khóa cố định không đổi tên được
               },
             });
-            console.log(response);
+            // console.log(response);
 
             // Lấy kết quả từ Bing API
             const resultsFromBing = response.data.webPages.value;
@@ -90,14 +92,14 @@ document.addEventListener("DOMContentLoaded", function () {
                   });
                 }
               }
-              console.log("resultsFromBingArray: ", resultsFromBingArray);
+              // console.log("resultsFromBingArray: ", resultsFromBingArray);
               const maxPercentageResult = resultsFromBingArray.reduce(
                 (max, item) => {
                   return item.percentage > max.percentage ? item : max;
                 },
                 { percentage: -Infinity }
               );
-              console.log("maxPercentageResult: ", maxPercentageResult);
+              // console.log("maxPercentageResult: ", maxPercentageResult);
 
               // matchedLink = maxPercentageResult.matchedLink;
               resultsFromBingArray = resultsFromBingArray
@@ -120,15 +122,15 @@ document.addEventListener("DOMContentLoaded", function () {
                   return 0; // Giữ nguyên thứ tự link
                 });
 
-              console.log(
-                "Những Link không phải trang Tripadvisor: ",
-                resultsFromBingArray
-              );
+              // console.log(
+              //   "Những Link không phải trang Tripadvisor: ",
+              //   resultsFromBingArray
+              // );
 
               matchedLink = resultsFromBingArray.map(
                 ({ percentage, ...rest }) => rest["matchedLink"]
               );
-              console.log(matchedLink);
+              // console.log(matchedLink);
             }
           } catch (error) {
             console.log("Lỗi khi tìm kiếm:", error);
@@ -142,6 +144,8 @@ document.addEventListener("DOMContentLoaded", function () {
             hotelAddress,
             matchedLinks: [...matchedLink],
           });
+          currentIndex++;
+          console.log("Dong thu:", currentIndex);
         }
 
         // Xuất kết quả ra file CSV
