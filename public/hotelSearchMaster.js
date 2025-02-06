@@ -105,17 +105,13 @@ document.addEventListener("DOMContentLoaded", function () {
                     !row.matchedLink.includes("tripadvisor")
                 )
                 .sort((a, b) => {
-                  if (
-                    a.matchedLink.includes("agoda") &&
-                    !b.matchedLink.includes("agoda")
-                  )
-                    return -1;
-                  if (
-                    !a.matchedLink.includes("agoda") &&
-                    b.matchedLink.includes("agoda")
-                  )
-                    return 1;
-                  return 0;
+                  const getPriority = (link) => {
+                    if (link.includes("agoda")) return 1; // Agoda ưu tiên cao nhất
+                    if (link.includes("booking")) return 2; // Booking ưu tiên thứ 2
+                    return 3; // Các trang khác ưu tiên thấp hơn
+                  };
+              
+                  return getPriority(a.matchedLink) - getPriority(b.matchedLink);
                 });
 
               matchedLink = resultsFromBraveArray.map(
