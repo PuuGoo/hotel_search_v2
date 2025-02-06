@@ -48,7 +48,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 .toLowerCase()
             );
 
-          const query = `${hotelName} ${hotelAddress}`;
+          const query = `${hotelName} ${hotelAddress} on agoda page`;
           const searchURL = `https://cors-anywhere-7jt3.onrender.com/https://api.crawlbase.com/?token=${subscriptionKey}&url=https://www.google.com/search?q=${encodeURIComponent(
             query
           )}`;
