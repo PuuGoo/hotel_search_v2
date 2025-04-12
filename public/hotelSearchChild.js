@@ -32,29 +32,49 @@ document.addEventListener("DOMContentLoaded", function () {
         );
         jsonData.shift(); // Bỏ dòng tiêu đề tức dòng đầu tiên
         console.log(jsonData.length);
+
+        const excludedDomains = [
+          "agoda",
+          "booking",
+          "trivago",
+          "expedia",
+          "zenhotels",
+          "skyscanner",
+          "airpaz",
+          "readytotrip",
+          "lodging-world",
+          "yatra",
+          "rentbyowner",
+          "goibibo",
+          "laterooms",
+          "tiket",
+        ];
+
         const results = []; // Tạo một mãng lưu trữ kết quả tìm kiếm được
         let order = 1; // Biến lưu số thứ tự khách sạn từ file
         let currentIndex = 0;
         // Duyệt qua từng dòng trong file Excel
         for (let row of jsonData) {
-          let [hotelNo, hotelName, hotelAddress] = row; // Phá hủy một mãng
-          // Nếu dòng dữ liệu trống thì bỏ qua không xử lý
-          if (!hotelName || !hotelAddress) {
-            continue;
-          }
+          let [hotelNo, hotelName, hotelCountry, hotelCity, hotelUrlType] = row;
+          if (!hotelName || !hotelCountry || !hotelCity) continue;
+
+          hotelName = hotelName.replace(/[^\x00-\x7F]/g, "");
           hotelName = hotelName.replace(/[^\x00-\x7F]/g, "");
           const hotelNameArray = hotelName
             .split(" ")
-            .map((part) =>
-              part
-                .replace(",", "")
-                .replace("(", "")
-                .replace(")", "")
-                .toLowerCase()
-            );
-          // console.log(hotelNameArray);
+            .map((part) => part.replace(/[(),]/g, "").toLowerCase());
 
-          const query = `${hotelName} ${hotelAddress}`; // Điều kiện tìm kiếm
+          let query = `${hotelName} ${hotelCountry} ${hotelCity}`;
+          let requireTripDomainOnly = false;
+
+          if (
+            hotelUrlType &&
+            hotelUrlType.trim().toLowerCase() === "ctrip superagg"
+          ) {
+            query += " trip";
+            requireTripDomainOnly = true;
+          }
+
           // const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(
           //   query
           // )}`; //encodeURIComponent mã hóa 1 chuỗi nhằm đảm bảo chuỗi được truyền an toàn qua URL, và mã hóa toàn bộ ký tự đặc biệt &, ?, =, /, :&, ?, =, /, :, bên cạnh đó encodeURI thì không mã hóa các ký tự đặc biệt &, ?, =, /, :
@@ -78,18 +98,28 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (resultsFromBing && resultsFromBing.length > 0) {
               let resultsFromBingArray = [];
+              let officialSite = null;
               // Lặp qua các kết quả tìm kiếm từ Bing
               for (let result of resultsFromBing) {
                 const pageTitle = result.name.toLowerCase(); // Tiêu đề của trang
                 // const pageSnippet = result.snippet.toLowerCase(); // Mô tả ngắn gọn của trang
                 const pageUrl = result.url;
-                // So sánh tên khách sạn với tiêu đề của trang web
-                const isMatch = isHotelNameInPage(hotelNameArray, pageTitle);
-                if (isMatch.status) {
-                  resultsFromBingArray.push({
-                    percentage: isMatch.percentage,
-                    matchedLink: pageUrl,
-                  });
+
+                if (
+                  !excludedDomains.some((domain) => pageUrl.includes(domain)) &&
+                  (!requireTripDomainOnly || pageUrl.includes("trip"))
+                ) {
+                  officialSite = pageUrl;
+                  console.log(pageUrl);
+
+                  const isMatch = isHotelNameInPage(hotelNameArray, pageTitle);
+
+                  if (isMatch.status) {
+                    resultsFromBingArray.push({
+                      percentage: isMatch.percentage,
+                      matchedLink: pageUrl,
+                    });
+                  }
                 }
               }
               // console.log("resultsFromBingArray: ", resultsFromBingArray);
@@ -102,25 +132,6 @@ document.addEventListener("DOMContentLoaded", function () {
               // console.log("maxPercentageResult: ", maxPercentageResult);
 
               // matchedLink = maxPercentageResult.matchedLink;
-              resultsFromBingArray = resultsFromBingArray
-                .filter(
-                  (row) =>
-                    row.percentage == maxPercentageResult.percentage &&
-                    !row.matchedLink.includes("tripadvisor")
-                )
-                .sort((a, b) => {
-                  if (
-                    a.matchedLink.includes("agoda") &&
-                    !b.matchedLink.includes("agoda")
-                  )
-                    return -1; // Ưu tiên link a
-                  if (
-                    !a.matchedLink.includes("agoda") &&
-                    b.matchedLink.includes("agoda")
-                  )
-                    return 1; // Ưu tiên link b
-                  return 0; // Giữ nguyên thứ tự link
-                });
 
               // console.log(
               //   "Những Link không phải trang Tripadvisor: ",
@@ -138,10 +149,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
           // Thêm số thứ tự vào kết quả , nếu không có link thì vẫn trả về kết quả với chữ "Không tìm thấy link"
           results.push({
-            order: order++, // Tăng số thứ tự
+            order: order++,
             hotelNo,
             hotelName,
-            hotelAddress,
+            hotelCountry,
+            hotelCity,
             matchedLinks: [...matchedLink],
           });
           currentIndex++;
@@ -168,45 +180,35 @@ function setupDownloadButton(results) {
 }
 // Hàm xuất ra file CSV
 function downloadCSV(results) {
-  // Tìm số lượng cột tối đa cho matchedLinks
   const maxMatchedLinks = Math.max(
     ...results.map((row) => row.matchedLinks.length)
   );
-
-  // Tạo tiêu đề CSV với các cột MatchedLink1, MatchedLink2, ..., MatchedLinkN
   const header =
-    "Order,No, Type, Hotel Name,Hotel Address," +
+    "Order, No, Type, Hotel Name, Hotel Country, Hotel City" +
     Array.from(
       { length: maxMatchedLinks },
       (_, i) => `Matched Link ${i + 1}`
     ).join(",") +
     "\n";
 
-  // Tạo nội dung CSV
   const csvContent =
     header +
     results
       .map((row) => {
-        // Ghép thông tin cơ bản và matchedLinks, bổ sung cột trống nếu thiếu liên kết
-        const links = row.matchedLinks.map((link) => `"${link}"`);
-        while (links.length < maxMatchedLinks) {
-          links.push('""'); // Thêm cột trống nếu thiếu
-        }
-        return `"${row.order}","${row.hotelNo}", Child,"${row.hotelName}","${
-          row.hotelAddress
-        }",${links.join(",")}`;
+        const links = row.matchedLinks.map((link) => `\"${link}\"`);
+        while (links.length < maxMatchedLinks) links.push('""');
+        return `\"${row.order}\",\"${row.hotelNo}\", Child,\"${
+          row.hotelName
+        }\",\"${row.hotelCountry}\",\"${row.hotelCity}\",${links.join(",")}`;
       })
       .join("\n");
-  // Tạo file blob
+
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
-  // Tạo một liên kết ẩn để tải file
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = "hotel_search_results.csv";
-  link.style.display = "none";
-
   document.body.appendChild(link);
-  link.click(); // Kích hoạt tải file tự động
+  link.click();
   document.body.removeChild(link);
 }
 // Hàm kiểm tra tên khách sạn có nằm trong tiêu đề trang hay không

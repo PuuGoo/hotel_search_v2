@@ -17,6 +17,7 @@ const __dirname = dirname(__filename);
 
 // Khởi tạo ứng dụng
 const app = express(); // App biến đại diện cho ứng dụng Express
+
 app.use(bodyParser.json()); // Middleware giúp xử lý các request với dữ liệu JSON
 app.use(bodyParser.urlencoded({ extended: true })); // Middleware xử lý dữ liệu URL-encoded từ các form HTML
 app.use(express.static(path.join(__dirname, "public")));
@@ -85,6 +86,13 @@ app.get("/BRAVE_MASTER", (req, res) => {
 app.get("/CRAWLBASE_MASTER", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "crawlbaseMaster.html"));
 });
+app.get("/searchXNG", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "hotelSearchXNG.html"));
+});
+app.get("/roomXNG", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "hotelRoomXNG.html"));
+});
+
 
 // Xử lý yêu cầu đăng nhập
 app.post("/login", async (req, res) => {
@@ -122,6 +130,6 @@ app.get("/logout", (req, res) => {
   });
 });
 
-app.listen(process.env.PORT || 3000, () => {
+app.listen(process.env.PORT || 3000, "0.0.0.0", () => {
   console.log(`Server đang chạy tại http://localhost:${process.env.PORT}`);
 });
