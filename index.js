@@ -110,28 +110,41 @@ app.get("/searchGo", checkAuthenticated, (req, res) => {
 
 // Xử lý yêu cầu đăng nhập
 app.post("/login", async (req, res) => {
-  const { username, password } = req.body; // Lấy thông tin đăng nhập từ body của yêu cầu
+  const usernameEnv = process.env.MY_USERNAME;
+  const passwordEnv = process.env.MY_PASSWORD;
+  const { username, password } = req.body;
+  console.log("Username:", username);
+  console.log("Password:", password);
+  console.log("Env username:", usernameEnv);
+  console.log("Env password:", passwordEnv);
 
   try {
-    // Truy vấn để kiểm tra xem người dùng có tồn tại trong cơ sở dũ liệu với username và password đã nhập
-    const query =
-      "SELECT * FROM users WHERE username = @username and password = @password"; // Dấu @ để đánh dấu tham số, ví dụ @username và @password là các biến tham số được sử dụng thay thế thay vì giá trị cụ thể
-    const result = await pool
-      .request() // Tạo yêu cầu SQL
-      .input("username", sql.VarChar, username) // Thêm tham số 'username' vào câu lệnh SQL
-      .input("password", sql.VarChar, password) // Thêm tham số 'password' vào câu lệnh SQL
-      .query(query); // Thực thi câu lệnh SQL
-
-    // Nếu tìm thấy người dùng trong cơ sở dữ liệu
-    if (result.recordset.length > 0) {
-      req.session.isAuthenticated = true; // Mark user as authenticated
-      res.redirect("/AZURE_CHILD");
+    if (username == usernameEnv && password == passwordEnv) {
+      req.session.isAuthenticated = true; // Đánh dấu user đã đăng nhập
+      res.redirect("/SEARCHGO"); // Redirect to a protected page after successful login
     } else {
-      res.status(401).send("Sai tên đăng nhập hoặc mật khẩu");
+      // Trả về trang thông báo rồi tự động redirect sau 5 giây
+      res.status(401).send(`
+      <h1>Sai tên đăng nhập hoặc mật khẩu</h1>
+      <p>Trang sẽ tự động chuyển về trang đăng nhập sau 3 giây...</p>
+      <script>
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 3000);
+      </script>
+    `);
     }
   } catch (error) {
-    console.error("Lỗi khi truy vấn cơ sở dữ liệu:", error); // In lỗi nếu có sự cố truy vấn cơ sở dữ liệu
-    res.status(500).send("Lỗi máy chủ."); // Trả về mã lỗi 500 (Internal Server Error) nếu gặp lỗi
+    console.error("Lỗi khi kiểm tra đăng nhập:", error);
+    res.status(500).send(`
+      <h1>Lỗi máy chủ.</h1>
+      <p>Trang sẽ tự động chuyển về trang đăng nhập sau 3 giây...</p>
+      <script>
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 3000);
+      </script>
+    `);
   }
 });
 // Route for logging out (to clear the session)
