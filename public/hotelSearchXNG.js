@@ -16,8 +16,9 @@ document.addEventListener("DOMContentLoaded", function () {
       // const subscriptionKey = document.getElementById("subscriptionKey").value;
 
       // Cập nhật endpoint cho Brave Search API
-      const endpoint = "http://127.0.0.1:8080/search";
+      // const endpoint = "http://127.0.0.1:8080/search";
       // const endpoint = "https://searxng-production-3523.up.railway.app/search";
+      const endpoint = "/api/search";
 
       reader.onload = async (e) => {
         const data = new Uint8Array(e.target.result);
@@ -34,6 +35,7 @@ document.addEventListener("DOMContentLoaded", function () {
         let order = 1;
         let currentIndex = 0;
         for (let row of jsonData) {
+          // await new Promise((resolve) => setTimeout(resolve, 10000)); // Delay 15s mỗi lần
           let [hotelNo, hotelName, hotelAddress, hotelUrlType] = row;
           if (!hotelName || !hotelAddress) continue;
 
@@ -57,7 +59,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
           const searchURL = `${endpoint}?q=${encodeURIComponent(
             query
-          )}&format=json`;
+          )}&format=json&hl=en-US&lr=lang_en&cr=&ie=utf8&oe=utf8&filter=0&start=0&asearch=arc&async=arc_id%3Asrp_-JOX0lWm09eUzwILiJukthn_100%2Cuse_ac%3Atrue%2C_fmt%3Aprog`;
 
           let matchedLink = [];
 
@@ -123,7 +125,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 .filter(
                   (row) =>
                     row.percentage == maxPercentageResult.percentage &&
-                    !row.matchedLink.includes("tripadvisor")
+                    !row.matchedLink.includes("tripadvisor") &&
+                    !row.matchedLink.includes("makemytrip")
                 )
                 .sort((a, b) => {
                   const getPriority = (link) => {

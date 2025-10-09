@@ -10,7 +10,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const file = fileInput.files[0];
       const reader = new FileReader();
-      const endpoint = "http://127.0.0.1:8080/search";
+      // const endpoint = "http://localhost:8080/search";
+      const endpoint = "/api/search";
+      // const endpoint = "https://searxng.hweeren.com/";
 
       reader.onload = async (e) => {
         const data = new Uint8Array(e.target.result);
@@ -27,7 +29,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const excludedDomains = [
           "agoda",
           "booking",
-          "trip",
           "trivago",
           "expedia",
           "zenhotels",
@@ -40,6 +41,7 @@ document.addEventListener("DOMContentLoaded", function () {
           "goibibo",
           "laterooms",
           "tiket",
+          "tripadvisor",
         ];
 
         const results = [];
@@ -47,24 +49,54 @@ document.addEventListener("DOMContentLoaded", function () {
         let currentIndex = 0;
 
         for (let row of jsonData) {
-          let [hotelNo, hotelName, hotelCountry, hotelCity] = row;
+          // await new Promise((resolve) => setTimeout(resolve, 3000)); // Delay 15s mỗi lần
+          let [hotelNo, hotelName, hotelCountry, hotelCity, hotelUrlType] = row;
           if (!hotelName || !hotelCountry || !hotelCity) continue;
 
           hotelName = hotelName.replace(/[^\x00-\x7F]/g, "");
           const hotelNameArray = hotelName
             .split(" ")
             .map((part) => part.replace(/[(),]/g, "").toLowerCase());
-          const query = `${hotelName}`;
+          let query = `${hotelName} ${hotelCountry} ${hotelCity}`;
+          let requireTripDomainOnly = false;
+
+          if (
+            hotelUrlType &&
+            hotelUrlType.trim().toLowerCase() === "ctrip superagg"
+          ) {
+            query += " trip";
+            requireTripDomainOnly = true;
+          }
+
+          console.log("Đang tìm:", query);
           const searchURL = `${endpoint}?q=${encodeURIComponent(
             query
-          )}&format=json&engine=google`;
+          )}&format=json`;
 
           let matchedLink = [];
           try {
-            const response = await fetch(searchURL, {
+            const options = {
               method: "GET",
-              headers: { "Content-Type": "application/json" },
-            });
+              mode: "cors",
+              credentials: "include", // Chỉ dùng nếu cần cookie
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+            };
+            const response = await fetch(searchURL, options);
+            // const url = `https://searx-search-api.p.rapidapi.com/search?q=${encodeURIComponent(
+            //   query
+            // )}&format=json`;
+            // const options = {
+            //   method: "GET",
+            //   headers: {
+            //     "x-rapidapi-key":
+            //       "e92a84b2e8msh4a75fb8d7498c48p1f34e4jsn9b18ebfa368f",
+            //     "x-rapidapi-host": "searx-search-api.p.rapidapi.com",
+            //   },
+            // };
+            // const response = await fetch(url, options);
             const data = await response.json();
             console.log(data);
 
@@ -76,19 +108,34 @@ document.addEventListener("DOMContentLoaded", function () {
               for (let result of resultsFromBrave) {
                 const pageTitle = result.title.toLowerCase();
                 const pageUrl = result.url;
-
+                const urlObj = new URL(pageUrl);
+                const parsed = tldts.parse(urlObj.hostname);
+                const fullHostname = parsed.hostname || ""; // full hostname, ví dụ: sub.wellcommhotels.com
+                const rootDomain = parsed.domain || ""; // root domain, ví dụ: wellcommhotels.com
                 if (
-                  !excludedDomains.some((domain) => pageUrl.includes(domain))
+                  !excludedDomains.some((domain) => pageUrl.includes(domain)) &&
+                  (!requireTripDomainOnly || pageUrl.includes("trip")) &&
+                  (requireTripDomainOnly ||
+                    hotelNameArray.some((part) => rootDomain.includes(part)))
                 ) {
                   officialSite = pageUrl;
-                  console.log(pageUrl);
+                  // console.log("Đường dẫn tìm được: ", pageUrl);
+                  // console.log("Domain chính tìm được: ", rootDomain);
+
+                  // Check if this link's hostname includes a part of the hotel name
 
                   const isMatch = isHotelNameInPage(hotelNameArray, pageTitle);
 
                   if (isMatch.status) {
+                    const matchScore = countHotelNameMatches(
+                      hotelNameArray,
+                      rootDomain
+                    );
                     resultsFromBraveArray.push({
                       percentage: isMatch.percentage,
                       matchedLink: pageUrl,
+                      rootDomain,
+                      matchScore,
                     });
                   }
                 }
@@ -97,6 +144,19 @@ document.addEventListener("DOMContentLoaded", function () {
               const maxPercentageResult = resultsFromBraveArray.reduce(
                 (max, item) => (item.percentage > max.percentage ? item : max),
                 { percentage: -Infinity }
+              );
+
+              // 👉 Sắp xếp theo matchScore cao nhất, sau đó đến phần trăm khớp tên
+              resultsFromBraveArray.sort((a, b) => {
+                if (b.matchScore !== a.matchScore) {
+                  return b.matchScore - a.matchScore;
+                }
+                return b.percentage - a.percentage;
+              });
+
+              console.log(
+                "Kết quả cuối cùng:\n" +
+                  resultsFromBraveArray.map((e) => e.matchedLink).join("\n")
               );
 
               matchedLink = resultsFromBraveArray.map(
@@ -116,7 +176,7 @@ document.addEventListener("DOMContentLoaded", function () {
             matchedLinks: [...matchedLink],
           });
           currentIndex++;
-          console.log("Dong thu:", currentIndex, "hoan thanh.");
+          console.log("Dong thu:", currentIndex, "hoan thanh.\n");
         }
 
         if (results.length > 0) {
@@ -141,7 +201,7 @@ function downloadCSV(results) {
     ...results.map((row) => row.matchedLinks.length)
   );
   const header =
-    "Order, No, Type, Hotel Name, Hotel Country, Hotel City" +
+    "Order, No, Type, Hotel Name, Hotel Country, Hotel City, " +
     Array.from(
       { length: maxMatchedLinks },
       (_, i) => `Matched Link ${i + 1}`
@@ -176,6 +236,22 @@ function isHotelNameInPage(hotelNameArray, pageTitle) {
     status: true,
     percentage: (matchCount / hotelNameArray.length) * 100,
   };
+}
+
+function countHotelNameMatches(hotelNameArray, hostname) {
+  let count = 0;
+  for (const part of hotelNameArray) {
+    if (hostname.includes(part)) count++;
+  }
+  return count;
+}
+
+function getRootDomain(hostname) {
+  const parts = hostname.split(".").reverse();
+  if (parts.length >= 2) {
+    return `${parts[1]}.${parts[0]}`;
+  }
+  return hostname;
 }
 
 function getPriority(link) {

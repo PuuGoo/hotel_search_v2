@@ -6,7 +6,6 @@
     <title>Document</title>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.2/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tldts@7.0.2/dist/index.umd.min.js"></script>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -116,7 +115,7 @@
     >
       <!-- Chức năng A: Form nhập liệu -->
       <h1>TÌM KIẾM KHÁCH SẠN CHO ĐỐI TƯỢNG MASTER</h1>
-      <div id="pageROOMXNG" class="page">
+      <div id="pageSEARCHGO" class="page">
         <h2>Vui lòng nhập dữ liệu</h2>
         <div class="form-container">
           <label for="file" class="form-label"
@@ -124,10 +123,10 @@
           >
           <input type="file" class="form-control" id="fileInput" />
 
-          <!-- <label for="subscription" class="form-label"
-            >Vui lòng nhập Key Brave</label
+          <label for="apiKeyInput" class="form-label"
+            >Vui lòng nhập Key Google</label
           >
-          <input type="text" class="form-control" id="subscriptionKey" /> -->
+          <input type="text" class="form-control" id="apiKeyInput" placeholder="Nhập API key ở đây"/>
           <button id="downloadCSVButton" style="display: none">
             Tải xuống CSV
           </button>
@@ -147,6 +146,6 @@
     </div>
 
     <script src="./libs/xlsx.full.min.js"></script>
-    <script src="hotelRoomXNG.js"></script>
+    <script src="hotelSearchGoogle.js"></script>
   </body>
 </html>

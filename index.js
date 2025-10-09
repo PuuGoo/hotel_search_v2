@@ -10,6 +10,8 @@ import path from "path";
 import session from "express-session"; // To manage sessions
 import dotenv from "dotenv"; // To manage sessions
 dotenv.config();
+import cors from "cors";
+import { createProxyMiddleware } from "http-proxy-middleware";
 
 // Get the directory name from import.meta.url
 const __filename = fileURLToPath(import.meta.url);
@@ -17,6 +19,16 @@ const __dirname = dirname(__filename);
 
 // Khởi tạo ứng dụng
 const app = express(); // App biến đại diện cho ứng dụng Express
+
+// ⚠️ Đặt proxy TRƯỚC khi dùng static
+app.use(
+  "/api",
+  createProxyMiddleware({
+    target: "http://localhost:8080",
+    changeOrigin: true,
+    pathRewrite: { "^/api": "" }, // /api/search => /search
+  })
+);
 
 app.use(bodyParser.json()); // Middleware giúp xử lý các request với dữ liệu JSON
 app.use(bodyParser.urlencoded({ extended: true })); // Middleware xử lý dữ liệu URL-encoded từ các form HTML
@@ -92,7 +104,9 @@ app.get("/searchXNG", (req, res) => {
 app.get("/roomXNG", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "hotelRoomXNG.html"));
 });
-
+app.get("/searchGo", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "hotelSearchGoogle.html"));
+});
 
 // Xử lý yêu cầu đăng nhập
 app.post("/login", async (req, res) => {
