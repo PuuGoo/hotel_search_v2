@@ -235,7 +235,7 @@ function isHotelNameInPage(hotelNameArray, pageTitle, pageSnippet) {
 
 // Cấu hình các trang và các nút liên quan
 const pages = {
-  AZURE_CHILD: ["AZURE_MASTER"],
+  AZURE_CHILD: ["SEARCHGO"],
   AZURE_MASTER: ["AZURE_CHILD"],
 };
 

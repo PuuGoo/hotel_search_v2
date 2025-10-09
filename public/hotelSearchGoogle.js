@@ -3,17 +3,25 @@ document.addEventListener("DOMContentLoaded", function () {
   document
     .getElementById("searchButton")
     .addEventListener("click", async () => {
+
       const apiKey = document.getElementById("apiKeyInput").value.trim();
-      if (!apiKey) {
-        alert("Vui lòng nhập API Key!");
-        return;
-      }
+
+
 
       const fileInput = document.getElementById("fileInput");
       if (fileInput.files.length === 0) {
         alert("Vui lòng chọn một file Excel!");
         return;
       }
+
+
+
+      if (!apiKey) {
+        alert("Vui lòng nhập API Key!");
+        return;
+      }
+
+
 
       const file = fileInput.files[0];
       const reader = new FileReader();
