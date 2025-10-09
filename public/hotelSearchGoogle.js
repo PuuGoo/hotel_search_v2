@@ -1,12 +1,21 @@
 // Đảm bảo rằng script chỉ chạy khi DOM đã tải xong
 document.addEventListener("DOMContentLoaded", function () {
+  localStorage.removeItem("runCount");
+  const MAX_RUNS = 100;
+  let runCount = parseInt(localStorage.getItem("runCount") || "0");
+  const counterEl = document.getElementById("counter");
+  // Cập nhật giao diện ban đầu
+  updateCounter(counterEl, runCount, MAX_RUNS);
+
   document
     .getElementById("searchButton")
     .addEventListener("click", async () => {
+      if (runCount >= MAX_RUNS) {
+        alert(`Đã vượt quá giới hạn ${MAX_RUNS} lượt chạy.`);
+        return;
+      }
 
       const apiKey = document.getElementById("apiKeyInput").value.trim();
-
-
 
       const fileInput = document.getElementById("fileInput");
       if (fileInput.files.length === 0) {
@@ -14,14 +23,10 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
       }
 
-
-
       if (!apiKey) {
         alert("Vui lòng nhập API Key!");
         return;
       }
-
-
 
       const file = fileInput.files[0];
       const reader = new FileReader();
@@ -46,6 +51,10 @@ document.addEventListener("DOMContentLoaded", function () {
         let currentIndex = 0;
 
         for (let row of jsonData) {
+          if (runCount >= MAX_RUNS) {
+            alert(`Đã đạt đến giới hạn ${MAX_RUNS} lượt chạy.`);
+            break;
+          }
           let [hotelNo, hotelName, hotelAddress, hotelUrlType] = row;
           if (!hotelName || !hotelAddress) continue;
 
@@ -75,7 +84,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
           try {
             const response = await fetch(searchURL);
+
+            // Kiểm tra lỗi quá giới hạn (429)
+            if (response.status === 429) {
+              alert(
+                "Đã vượt quá số lượng truy vấn hàng ngày của Key nay. Vui lòng thử lại sau vào ngày mai hoặc thay đổi Key khác."
+              );
+              return; // Dừng vòng lặp / không tiếp tục
+            }
+
             const data = await response.json();
+
+            // Nếu không có lỗi và có data:
+            runCount++;
+            localStorage.setItem("runCount", runCount);
+            updateCounter(counterEl, runCount, MAX_RUNS);
 
             const items = data.items || [];
             let resultsFromGoogleArray = [];
@@ -151,6 +174,11 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 });
 
+function updateCounter(counterEl, runCount, MAX_RUNS) {
+  if (counterEl) {
+    counterEl.textContent = `${runCount}/${MAX_RUNS} lượt đã chạy`;
+  }
+}
 // Thêm nút tải xuống CSV sau khi có dữ liệu
 function setupDownloadButton(results) {
   const downloadButton = document.getElementById("downloadCSVButton");
