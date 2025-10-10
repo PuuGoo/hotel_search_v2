@@ -78,11 +78,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
           const searchURL = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${encodeURIComponent(
             query
-          )}  &gl=us
-  &hl=en
-  &lr=lang_en
-  &cr=countryUS
-  &num=10`;
+          )};
 
           let matchedLink = [];
 
