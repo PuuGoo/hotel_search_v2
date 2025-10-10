@@ -187,7 +187,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 function updateCounter(counterEl, runCount, MAX_RUNS) {
   if (counterEl) {
-    counterEl.textContent = `${runCount}/${MAX_RUNS} lượt đã chạy`;
+    counterEl.textContent = `${runCount} / ${MAX_RUNS} lượt đã chạy`;
   }
 }
 // Thêm nút tải xuống CSV sau khi có dữ liệu
