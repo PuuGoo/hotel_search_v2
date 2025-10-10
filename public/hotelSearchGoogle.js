@@ -82,7 +82,6 @@ document.addEventListener("DOMContentLoaded", function () {
   &hl=en
   &lr=lang_en
   &cr=countryUS
-  &safe=off
   &num=10`;
 
           let matchedLink = [];
