@@ -94,6 +94,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             const data = await response.json();
+            console.log(data);
 
             // Nếu không có lỗi và có data:
             runCount++;
