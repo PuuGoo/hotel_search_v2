@@ -133,7 +133,7 @@ document.addEventListener("DOMContentLoaded", function () {
               .sort((a, b) => {
                 const getPriority = (link) => {
                     if (link.includes("trip")) return 1; // Trip ưu tiên thứ 3
-                    if (link.includes("agoda")) return 2; // Agoda ưu tiên cao nhất
+                    if (link.includes("airpaz")) return 2; // Expedia ưu tiên thứ 3
                     if (link.includes("booking")) return 3; // Booking ưu tiên thứ 2
                     if (link.includes("hotels")) return 4; // Hotels ưu tiên thứ 3
                     if (link.includes("hotel")) return 5; // Hotel ưu tiên thứ 3
@@ -141,7 +141,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     if (link.includes("expedia")) return 7; // Expedia ưu tiên thứ 3
                     if (link.includes("zenhotels")) return 8; // Expedia ưu tiên thứ 3
                     if (link.includes("skyscanner")) return 9; // Expedia ưu tiên thứ 3
-                    if (link.includes("airpaz")) return 10; // Expedia ưu tiên thứ 3
+                    if (link.includes("agoda")) return 10; // Agoda ưu tiên cao nhất
                     if (link.includes("readytotrip")) return 11; // Expedia ưu tiên thứ 3
                     if (link.includes("lodging-world")) return 12; // Expedia ưu tiên thứ 3
                     if (link.includes("yatra")) return 13; // Expedia ưu tiên thứ 3
