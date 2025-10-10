@@ -132,14 +132,24 @@ document.addEventListener("DOMContentLoaded", function () {
               )
               .sort((a, b) => {
                 const getPriority = (link) => {
-                  if (link.includes("agoda")) return 1;
-                  if (link.includes("booking")) return 2;
-                  if (link.includes("trip")) return 3;
-                  if (link.includes("hotels")) return 4;
-                  if (link.includes("hotel")) return 5;
-                  if (link.includes("trivago")) return 6;
-                  if (link.includes("expedia")) return 7;
-                  return 99;
+                    if (link.includes("trip")) return 1; // Trip ưu tiên thứ 3
+                    if (link.includes("agoda")) return 2; // Agoda ưu tiên cao nhất
+                    if (link.includes("booking")) return 3; // Booking ưu tiên thứ 2
+                    if (link.includes("hotels")) return 4; // Hotels ưu tiên thứ 3
+                    if (link.includes("hotel")) return 5; // Hotel ưu tiên thứ 3
+                    if (link.includes("trivago")) return 6; // Trivago ưu tiên thứ 3
+                    if (link.includes("expedia")) return 7; // Expedia ưu tiên thứ 3
+                    if (link.includes("zenhotels")) return 8; // Expedia ưu tiên thứ 3
+                    if (link.includes("skyscanner")) return 9; // Expedia ưu tiên thứ 3
+                    if (link.includes("airpaz")) return 10; // Expedia ưu tiên thứ 3
+                    if (link.includes("readytotrip")) return 11; // Expedia ưu tiên thứ 3
+                    if (link.includes("lodging-world")) return 12; // Expedia ưu tiên thứ 3
+                    if (link.includes("yatra")) return 13; // Expedia ưu tiên thứ 3
+                    if (link.includes("rentbyowner")) return 14; // Expedia ưu tiên thứ 3
+                    if (link.includes("goibibo")) return 15; // Expedia ưu tiên thứ 3
+                    if (link.includes("laterooms")) return 16; // Expedia ưu tiên thứ 3
+                    if (link.includes("tiket")) return 17; // Expedia ưu tiên thứ 3
+                    return 18; // Các trang khác ưu tiên thấp hơn
                 };
                 return getPriority(a.matchedLink) - getPriority(b.matchedLink);
               });
