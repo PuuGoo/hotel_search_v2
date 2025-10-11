@@ -69,9 +69,11 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           console.log(query);
 
-          const searchURL = `http://localhost:3000/searchApiTavily?q=${encodeURIComponent(
-            query
-          )}`;
+          // const searchURL = `http://localhost:3000/searchApiTavily?q=${encodeURIComponent(
+          //   query
+          // )}`;
+
+          const searchURL = `/searchApiTavily?q=${encodeURIComponent(query)}`;
 
           let matchedLink = [];
 
