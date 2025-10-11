@@ -235,10 +235,10 @@ app.get("/searchXNG", (req, res) => {
 app.get("/roomXNG", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "hotelRoomXNG.html"));
 });
-app.get("/searchGo", (req, res) => {
+app.get("/searchGo", checkAuthenticated, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "hotelSearchGoogle.html"));
 });
-app.get("/searchApiGo", async (req, res) => {
+app.get("/searchApiGo", checkAuthenticated, async (req, res) => {
   console.log("Query string nhận được:", req.query); // 👈 dòng này để debug
   const query = req.query.q; // Default query if none provided
 
