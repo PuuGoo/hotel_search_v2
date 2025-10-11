@@ -274,6 +274,7 @@ function isHotelNameInPage(hotelNameArray, pageTitle) {
 
 // Cấu hình các trang và các nút liên quan
 const pages = {
+  SEARCHTAVILY: ["SEARCHGO"],
   SEARCHGO: ["SEARCHTAVILY"],
 };
 
@@ -286,17 +287,37 @@ function switchPage(page) {
   document.querySelectorAll(".page").forEach((p) => (p.style.display = "none"));
 
   // Hiển thị trang hiện tại
-  document.getElementById(`page${page}`).style.display = "block";
+  const pageElement = document.getElementById(`page${page}`);
+  if (!pageElement) {
+    console.error(`Không tìm thấy phần tử với id="page${page}"`);
+    return;
+  }
+  pageElement.style.display = "block";
 
-  // Cập nhật các nút chức năng
+  // Tạo nút cho các trang liên quan
   const buttonContainer = document.querySelector(".button-container");
-  buttonContainer.innerHTML = ""; // Xóa các nút hiện tại
+  buttonContainer.innerHTML = "";
+
   pages[page].forEach((p) => {
     const a = document.createElement("a");
     a.href = p;
+
     const button = document.createElement("button");
     button.textContent = `Chức năng ${p}`;
-    button.onclick = () => switchPage(p);
+
+    button.onclick = (e) => {
+      e.preventDefault();
+
+      // Thay đổi trạng thái nút **hiện tại** trước khi chuyển trang
+      button.textContent = "Đang chuyển trang sau 2 giây...";
+      button.disabled = true;
+
+      // Sau 3 giây mới chuyển trang
+      setTimeout(() => {
+        switchPage(p);
+      }, 2000);
+    };
+
     a.appendChild(button);
     buttonContainer.appendChild(a);
   });
