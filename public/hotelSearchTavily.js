@@ -69,11 +69,15 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           console.log(query);
 
-          // const searchURL = `http://localhost:3000/searchApiTavily?q=${encodeURIComponent(
-          //   query
-          // )}`;
+          let searchURL;
 
-          const searchURL = `/searchApiTavily?q=${encodeURIComponent(query)}`;
+          if (window.location.hostname === "localhost") {
+            searchURL = `http://localhost:3000/searchApiTavily?q=${encodeURIComponent(
+              query
+            )}`;
+          } else {
+            searchURL = `/searchApiTavily?q=${encodeURIComponent(query)}`;
+          }
 
           let matchedLink = [];
 
