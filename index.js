@@ -13,7 +13,6 @@ dotenv.config();
 import cors from "cors";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { tavily } from "@tavily/core";
-import cookie from "cookie"; // nhớ import thư viện cookie nếu dùng
 
 // Get the directory name from import.meta.url
 const __filename = fileURLToPath(import.meta.url);
@@ -294,18 +293,6 @@ app.post("/login", async (req, res) => {
   try {
     if (username == usernameEnv && password == passwordEnv) {
       req.session.isAuthenticated = true; // Đánh dấu user đã đăng nhập
-      // Set thêm cookie thủ công (ví dụ token)
-      const tokenValue = "giá trị token ở đây"; // có thể là JWT hoặc gì đó
-      res.setHeader(
-        "Set-Cookie",
-        cookie.serialize("token", tokenValue, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production", // true khi deploy Vercel
-          sameSite: "lax",
-          path: "/",
-          maxAge: 60 * 60 * 24 * 7, // 7 ngày
-        })
-      );
       res.redirect("/SEARCHTAVILY"); // Redirect to a protected page after successful login
     } else {
       // Trả về trang thông báo rồi tự động redirect sau 5 giây
