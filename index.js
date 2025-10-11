@@ -86,8 +86,8 @@ function checkAuthenticated(req, res, next) {
   }
 }
 
-// danh sách các API key
-const apiKeys = [
+// danh sách các API key Tavily
+const apiTavilyKeys = [
   process.env.TAVILY_API_KEY_1,
   process.env.TAVILY_API_KEY_2,
   process.env.TAVILY_API_KEY_3,
@@ -102,12 +102,12 @@ const apiKeys = [
 
 let currentKeyTavilyIndex = 0;
 function getClient() {
-  const key = apiKeys[currentKeyTavilyIndex];
+  const key = apiTavilyKeys[currentKeyTavilyIndex];
   return tavily({ apiKey: key });
 }
 async function searchWithRetry(query) {
   let attempts = 0;
-  const maxAttempts = apiKeys.length;
+  const maxAttempts = apiTavilyKeys.length;
 
   while (attempts < maxAttempts) {
     const client = getClient();
@@ -128,7 +128,7 @@ async function searchWithRetry(query) {
         );
         currentKeyIndex++;
 
-        if (currentKeyIndex >= apiKeys.length) {
+        if (currentKeyIndex >= apiTavilyKeys.length) {
           throw new Error("Tất cả API key đã hết lượt trong tháng!");
         }
 
@@ -141,6 +141,79 @@ async function searchWithRetry(query) {
   }
 
   throw new Error("Không thể thực hiện search sau khi thử tất cả API key.");
+}
+
+// danh sách các API key Go
+const apiGoogleKeys = [
+  process.env.GO_API_KEY_1,
+  process.env.GO_API_KEY_2,
+  process.env.GO_API_KEY_3,
+  process.env.GO_API_KEY_4,
+  process.env.GO_API_KEY_5,
+  process.env.GO_API_KEY_6,
+  process.env.GO_API_KEY_7,
+  process.env.GO_API_KEY_8,
+  process.env.GO_API_KEY_9,
+  process.env.GO_API_KEY_10,
+];
+
+const SEARCH_ENGINE_ID = process.env.GOOGLE_SEARCH_ENGINE_ID; // cx
+
+let currentKeyGoogleIndex = 0;
+// Hàm gọi Google Search API với key hiện tại
+async function callGoogleSearchAPI(query, apiKey) {
+  const url = "https://www.googleapis.com/customsearch/v1";
+
+  const response = await axios.get(url, {
+    params: {
+      key: apiKey,
+      cx: SEARCH_ENGINE_ID,
+      q: query,
+    },
+  });
+
+  return response.data;
+}
+
+// Hàm tìm kiếm có retry qua các API key
+async function searchWithRetryGo(query) {
+  let attempts = 0;
+  const maxAttempts = apiGoogleKeys.length;
+
+  while (attempts < maxAttempts) {
+    const apiKey = apiGoogleKeys[currentKeyGoogleIndex];
+
+    try {
+      const result = await callGoogleSearchAPI(query, apiKey);
+      return result;
+    } catch (error) {
+      const status = error?.response?.status || 0;
+
+      if ([403, 429].includes(status)) {
+        console.warn(
+          `API key #${
+            currentKeyGoogleIndex + 1
+          } bị giới hạn (status ${status}). Chuyển sang key tiếp theo...`
+        );
+        currentKeyGoogleIndex++;
+
+        if (currentKeyGoogleIndex >= apiGoogleKeys.length) {
+          throw new Error("Tất cả API key đã hết lượt hoặc bị giới hạn.");
+        }
+
+        attempts++;
+      } else {
+        // Lỗi khác ngoài quota → dừng lại luôn
+        console.error(
+          "Lỗi khi gọi Google API:",
+          error.response?.data || error.message
+        );
+        throw error;
+      }
+    }
+  }
+
+  throw new Error("Không thể thực hiện tìm kiếm sau khi thử tất cả API key.");
 }
 
 // Định tuyến cho trang đăng nhập
@@ -162,8 +235,27 @@ app.get("/searchXNG", (req, res) => {
 app.get("/roomXNG", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "hotelRoomXNG.html"));
 });
-app.get("/searchGo", checkAuthenticated, (req, res) => {
+app.get("/searchGo", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "hotelSearchGoogle.html"));
+});
+app.get("/searchApiGo", async (req, res) => {
+  console.log("Query string nhận được:", req.query); // 👈 dòng này để debug
+  const query = req.query.q; // Default query if none provided
+
+  if (!query) {
+    return res.status(400).json({ error: "Thiếu tham số q" });
+  }
+
+  try {
+    const result = await searchWithRetryGo(query);
+    res.json(result);
+  } catch (error) {
+    console.error("Go error:", error);
+    res.status(500).json({
+      error: "Search Failed",
+      details: error.message || error.toString(),
+    });
+  }
 });
 app.get("/searchTavily", checkAuthenticated, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "hotelSearchTavily.html"));
