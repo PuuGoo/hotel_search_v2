@@ -285,10 +285,6 @@ app.post("/login", async (req, res) => {
   const usernameEnv = process.env.MY_USERNAME;
   const passwordEnv = process.env.MY_PASSWORD;
   const { username, password } = req.body;
-  console.log("Username:", username);
-  console.log("Password:", password);
-  console.log("Env username:", usernameEnv);
-  console.log("Env password:", passwordEnv);
 
   try {
     if (username == usernameEnv && password == passwordEnv) {
