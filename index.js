@@ -12,6 +12,7 @@ import dotenv from "dotenv"; // To manage sessions
 dotenv.config();
 import cors from "cors";
 import { createProxyMiddleware } from "http-proxy-middleware";
+import { tavily } from "@tavily/core";
 
 // Get the directory name from import.meta.url
 const __filename = fileURLToPath(import.meta.url);
@@ -85,6 +86,63 @@ function checkAuthenticated(req, res, next) {
   }
 }
 
+// danh sách các API key
+const apiKeys = [
+  process.env.TAVILY_API_KEY_1,
+  process.env.TAVILY_API_KEY_2,
+  process.env.TAVILY_API_KEY_3,
+  process.env.TAVILY_API_KEY_4,
+  process.env.TAVILY_API_KEY_5,
+  process.env.TAVILY_API_KEY_6,
+  process.env.TAVILY_API_KEY_7,
+  process.env.TAVILY_API_KEY_8,
+  process.env.TAVILY_API_KEY_9,
+  process.env.TAVILY_API_KEY_10,
+];
+
+let currentKeyTavilyIndex = 0;
+function getClient() {
+  const key = apiKeys[currentKeyTavilyIndex];
+  return tavily({ apiKey: key });
+}
+async function searchWithRetry(query) {
+  let attempts = 0;
+  const maxAttempts = apiKeys.length;
+
+  while (attempts < maxAttempts) {
+    const client = getClient();
+
+    try {
+      // thử gọi API
+      const result = await client.search(query);
+      return result;
+    } catch (error) {
+      const status = error?.response?.status || 0;
+
+      // Kiểm tra xem lỗi có phải do hết quota không
+      if (status === 403 || status === 422 || status === 429) {
+        console.warn(
+          `API key ${
+            currentKeyIndex + 1
+          } hết lượt trong tháng, chuyển key tiếp theo...`
+        );
+        currentKeyIndex++;
+
+        if (currentKeyIndex >= apiKeys.length) {
+          throw new Error("Tất cả API key đã hết lượt trong tháng!");
+        }
+
+        attempts++;
+      } else {
+        // Nếu là lỗi khác không phải quota → trả về lỗi ngay
+        throw error;
+      }
+    }
+  }
+
+  throw new Error("Không thể thực hiện search sau khi thử tất cả API key.");
+}
+
 // Định tuyến cho trang đăng nhập
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "login.html"));
@@ -107,6 +165,28 @@ app.get("/roomXNG", (req, res) => {
 app.get("/searchGo", checkAuthenticated, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "hotelSearchGoogle.html"));
 });
+app.get("/searchTavily", checkAuthenticated, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "hotelSearchTavily.html"));
+});
+app.get("/searchApiTavily", checkAuthenticated, async (req, res) => {
+  console.log("Query string nhận được:", req.query); // 👈 dòng này để debug
+  const query = req.query.q; // Default query if none provided
+
+  if (!query) {
+    return res.status(400).json({ error: "Thiếu tham số q" });
+  }
+
+  try {
+    const result = await searchWithRetry(query);
+    res.json(result);
+  } catch (error) {
+    console.error("Tavily error:", error);
+    res.status(500).json({
+      error: "Search Failed",
+      details: error.message || error.toString(),
+    });
+  }
+});
 
 // Xử lý yêu cầu đăng nhập
 app.post("/login", async (req, res) => {
@@ -121,7 +201,7 @@ app.post("/login", async (req, res) => {
   try {
     if (username == usernameEnv && password == passwordEnv) {
       req.session.isAuthenticated = true; // Đánh dấu user đã đăng nhập
-      res.redirect("/SEARCHGO"); // Redirect to a protected page after successful login
+      res.redirect("/SEARCHTAVILY"); // Redirect to a protected page after successful login
     } else {
       // Trả về trang thông báo rồi tự động redirect sau 5 giây
       res.status(401).send(`

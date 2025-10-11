@@ -245,8 +245,7 @@ function isHotelNameInPage(hotelNameArray, pageTitle) {
 
 // Cấu hình các trang và các nút liên quan
 const pages = {
-  AZURE_CHILD: ["AZURE_MASTER"],
-  AZURE_MASTER: ["AZURE_CHILD"],
+  SEARCHGO: ["SEARCHTAVILY"],
 };
 
 // Hàm thay đổi nội dung và hiển thị nút
