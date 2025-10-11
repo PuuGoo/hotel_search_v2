@@ -98,6 +98,16 @@ const apiTavilyKeys = [
   process.env.TAVILY_API_KEY_8,
   process.env.TAVILY_API_KEY_9,
   process.env.TAVILY_API_KEY_10,
+  process.env.TAVILY_API_KEY_11,
+  process.env.TAVILY_API_KEY_12,
+  process.env.TAVILY_API_KEY_13,
+  process.env.TAVILY_API_KEY_14,
+  process.env.TAVILY_API_KEY_15,
+  process.env.TAVILY_API_KEY_16,
+  process.env.TAVILY_API_KEY_17,
+  process.env.TAVILY_API_KEY_18,
+  process.env.TAVILY_API_KEY_19,
+  process.env.TAVILY_API_KEY_20,
 ];
 
 let currentKeyTavilyIndex = 0;
