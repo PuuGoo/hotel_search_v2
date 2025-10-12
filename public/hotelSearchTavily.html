@@ -106,6 +106,20 @@
         margin-top: 18px;
         /* make results card full width of the parent card-panel */
         width: 100%;
+        /* Use internal padding to create symmetric gutters instead of asymmetric margins */
+        padding-left: 24px;
+        padding-right: 24px;
+        box-sizing: border-box;
+      }
+      /* Inner wrapper to control max-width and keep consistent padding */
+      .results-inner {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding-left: 0;
+        padding-right: 0;
+        box-sizing: border-box;
+        width: 100%;
+        position: relative;
       }
       /* Ensure inner results card-panel doesn't restrict width differently */
       .results-card .card-panel { padding: 12px; box-shadow: none; border: none; background: transparent }
@@ -117,14 +131,40 @@
       /* Rounded corners for results table to match input card */
       .table-responsive {
         border-radius: 10px;
-        overflow: hidden;
+        overflow: auto; /* allow horizontal scroll on small screens */
         border: 1px solid rgba(8,40,45,0.04);
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* Ensure margins adapt on smaller viewports */
+      @media (max-width: 900px) {
+        .results-card {
+          margin-left: 16px;
+          margin-right: 16px;
+        }
+      }
+      @media (max-width: 520px) {
+        .results-card {
+          margin-left: 12px;
+          margin-right: 12px;
+        }
+        table#resultsTable td{white-space:normal;}
+        table#resultsTable thead tr th:last-child,
+        table#resultsTable tbody tr td:last-child { min-width: 140px; width:140px }
+        .matched-cell { max-width: 220px; }
       }
       /* give the table header and footer rounded corners */
       table#resultsTable thead tr th:first-child { border-top-left-radius: 10px }
       table#resultsTable thead tr th:last-child { border-top-right-radius: 10px }
       table#resultsTable tbody tr:last-child td:first-child { border-bottom-left-radius: 10px }
       table#resultsTable tbody tr:last-child td:last-child { border-bottom-right-radius: 10px }
+      /* Ensure Actions column is wide enough to show multiple buttons */
+      table#resultsTable thead tr th:last-child,
+      table#resultsTable tbody tr td:last-child {
+        min-width: 180px;
+        width: 180px;
+        white-space: nowrap;
+      }
       table.table tbody tr:hover {
         background: #f2fbff;
       }
@@ -151,6 +191,8 @@
           width: 100%;
         }
       }
+      /* selected row highlight for keyboard shortcuts */
+      tr.selected-row { outline: 3px solid rgba(6,122,138,0.12); background:#eefaf9; }
     </style>
     <style>
       /* Simple modal styles */
@@ -309,6 +351,7 @@
         <!-- Live results -->
         <div class="results-card">
           <div class="card-panel results-card">
+        <div class="results-inner">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
               <div>
                 <h3 style="margin:0">Kết quả (Live)</h3>
@@ -332,11 +375,12 @@
                     <th>Hotel Name</th>
                     <th>Hotel Address</th>
                     <th>Matched Links</th>
-                    <th style="width:120px">Actions</th>
+                    <th style="width:180px">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="resultsBody"></tbody>
               </table>
+            </div>
             </div>
           </div>
         </div>

@@ -20,6 +20,14 @@ document.addEventListener("DOMContentLoaded", function () {
   } catch (e) {}
   // Cập nhật giao diện ban đầu
   updateCounter(counterEl, runCount, MAX_RUNS);
+  // focus the filter input on load so user can start typing immediately
+  try {
+    const initialFilter = document.getElementById("filterInput");
+    if (initialFilter) {
+      initialFilter.focus();
+      if (typeof initialFilter.select === "function") initialFilter.select();
+    }
+  } catch (e) {}
 
   document
     .getElementById("searchButton")
@@ -141,6 +149,12 @@ document.addEventListener("DOMContentLoaded", function () {
       window.currentResults && window.currentResults.length
         ? window.currentResults
         : [];
+    // Ensure pause button is visible when a run starts
+    const pauseBtnEl = document.getElementById("pauseResumeButton");
+    if (pauseBtnEl) {
+      pauseBtnEl.style.display = "inline-block";
+      pauseBtnEl.textContent = "Tạm dừng";
+    }
     let order = results.length ? results[results.length - 1].order + 1 : 1;
     let currentIndex = results.length || 0;
     MAX_RUNS = jsonData.length;
@@ -551,45 +565,64 @@ function appendResultRow(row) {
     };color:${
     status === "Matched" ? "#0b7a53" : "#a33"
   };font-weight:600">${escapeHtml(status)}</span></td>
-    <td title="${escapeHtml(row.hotelName)}">${escapeHtml(row.hotelName)}</td>
-    <td title="${escapeHtml(row.hotelAddress)}">${escapeHtml(
+    <td class="copy-hotel" title="${escapeHtml(row.hotelName)}">${escapeHtml(
+    row.hotelName
+  )}</td>
+    <td class="copy-hotel" title="${escapeHtml(row.hotelAddress)}">${escapeHtml(
     row.hotelAddress
   )}</td>
     <td class="matched-cell">${linksHtml}</td>
     <td>
-      <button class="btn btn-sm btn-outline-custom" data-action="open">Mở</button>
-      <button class="btn btn-sm btn-outline-custom" data-action="copy" style="margin-left:6px">Sao chép</button>
-      <button class="btn btn-sm btn-outline-custom" data-action="toggle" style="margin-left:6px">Xem</button>
+      <button class="btn btn-sm btn-outline-custom" data-action="open-all">Mở tất cả</button>
     </td>
   `;
 
   // attach actions
-  const openBtn = tr.querySelector('button[data-action="open"]');
-  const copyBtn = tr.querySelector('button[data-action="copy"]');
-  // Open first link only to avoid popup blockers
-  openBtn &&
-    openBtn.addEventListener("click", () => {
-      const first = links[0];
-      const url = first
-        ? typeof first === "string"
-          ? first
-          : first.url || ""
-        : "";
-      if (url) window.open(url, "_blank");
+  const openAllBtn = tr.querySelector('button[data-action="open-all"]');
+  // determine available URLs for this row (strings), dedupe and trim
+  const urlsRaw = links
+    .map((l) => (typeof l === "string" ? l : l.url || ""))
+    .filter(Boolean)
+    .map((u) => String(u).trim());
+  const uniqueUrls = Array.from(new Set(urlsRaw));
+  // UI hints: hide/disable open-all when there are 0 or 1 links
+  if (openAllBtn) {
+    if (uniqueUrls.length <= 1) {
+      openAllBtn.style.display = "none";
+      openAllBtn.disabled = true;
+      openAllBtn.setAttribute("aria-hidden", "true");
+    } else {
+      openAllBtn.style.display = "";
+      openAllBtn.disabled = false;
+      openAllBtn.title = `Mở tất cả ${uniqueUrls.length} liên kết`;
+      openAllBtn.removeAttribute("aria-hidden");
+    }
+    // Open all links: staggered to reduce popup blocking
+    openAllBtn.addEventListener("click", () => {
+      if (!uniqueUrls.length) return;
+      const delay = 180; // ms between opens
+      uniqueUrls.forEach((u, i) => {
+        try {
+          setTimeout(() => window.open(u, "_blank"), i * delay);
+        } catch (e) {
+          console.error("Open all failed for", u, e);
+        }
+      });
     });
-  // Copy all links (each on new line)
-  copyBtn &&
-    copyBtn.addEventListener("click", () => {
-      const all = links
-        .map((l) => (typeof l === "string" ? l : l.url || ""))
-        .filter(Boolean)
-        .join("\n");
-      if (all) {
-        navigator.clipboard && navigator.clipboard.writeText(all);
-      }
-    });
+  }
+  // Note: per-row inline "Sao chép" has been removed; per-link copy is available in the ⋯ menu
 
   body.appendChild(tr);
+
+  // make row focusable and selectable for keyboard shortcuts
+  tr.tabIndex = 0;
+  tr.style.cursor = "pointer";
+  tr.addEventListener("click", () => {
+    // remove previous selection
+    const prev = document.querySelector("tr.selected-row");
+    if (prev && prev !== tr) prev.classList.remove("selected-row");
+    tr.classList.add("selected-row");
+  });
 
   // add expandable detail row immediately after
   const detailTr = document.createElement("tr");
@@ -623,91 +656,7 @@ function appendResultRow(row) {
     });
   }
 
-  // create per-row menu for individual link actions (open/copy)
-  (function createPerRowMenu() {
-    const actionsCell = tr.querySelector("td:last-child");
-    if (!actionsCell) return;
-    actionsCell.style.position = "relative";
-    const menuBtn = document.createElement("button");
-    menuBtn.className = "btn btn-sm btn-outline-custom";
-    menuBtn.textContent = "⋯";
-    menuBtn.style.marginLeft = "6px";
-    actionsCell.appendChild(menuBtn);
-
-    const menu = document.createElement("div");
-    menu.style.position = "absolute";
-    menu.style.right = "0";
-    menu.style.top = "calc(100% + 6px)";
-    menu.style.background = "#fff";
-    menu.style.border = "1px solid rgba(0,0,0,0.08)";
-    menu.style.boxShadow = "0 6px 18px rgba(0,0,0,0.08)";
-    menu.style.padding = "8px";
-    menu.style.borderRadius = "8px";
-    menu.style.display = "none";
-    menu.style.zIndex = 9999;
-    menu.style.minWidth = "260px";
-
-    links.forEach((l, idx) => {
-      const url = typeof l === "string" ? l : l.url || "";
-      const pct = Math.round(l.percentage || 0);
-      const rowDiv = document.createElement("div");
-      rowDiv.style.display = "flex";
-      rowDiv.style.justifyContent = "space-between";
-      rowDiv.style.alignItems = "center";
-      rowDiv.style.marginBottom = "6px";
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.target = "_blank";
-      a.textContent = shortenUrl(url);
-      a.style.color = "#036";
-      a.style.marginRight = "8px";
-      a.style.flex = "1";
-
-      const rightGroup = document.createElement("div");
-      rightGroup.style.display = "flex";
-
-      const openSingle = document.createElement("button");
-      openSingle.className = "btn btn-sm btn-outline-custom";
-      openSingle.textContent = "Mở";
-      openSingle.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        window.open(url, "_blank");
-        menu.style.display = "none";
-      });
-
-      const copySingle = document.createElement("button");
-      copySingle.className = "btn btn-sm btn-outline-custom";
-      copySingle.textContent = "Sao chép";
-      copySingle.style.marginLeft = "6px";
-      copySingle.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        navigator.clipboard && navigator.clipboard.writeText(url);
-        menu.style.display = "none";
-      });
-
-      const pctSpan = document.createElement("small");
-      pctSpan.style.color = "#888";
-      pctSpan.style.marginLeft = "8px";
-      pctSpan.textContent = pct + "%";
-
-      rightGroup.appendChild(openSingle);
-      rightGroup.appendChild(copySingle);
-      rowDiv.appendChild(a);
-      rowDiv.appendChild(rightGroup);
-      menu.appendChild(rowDiv);
-    });
-
-    actionsCell.appendChild(menu);
-    menuBtn.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      menu.style.display = menu.style.display === "none" ? "block" : "none";
-    });
-    document.addEventListener("click", () => {
-      menu.style.display = "none";
-    });
-    menu.addEventListener("click", (ev) => ev.stopPropagation());
-  })();
+  // per-row menu removed: individual link actions are not shown inline
 
   // update results count (count only main rows)
   const resultsCountEl = document.getElementById("resultsCount");
@@ -715,6 +664,84 @@ function appendResultRow(row) {
     resultsCountEl.textContent = Array.from(body.children).filter(
       (r) => !r.classList.contains("detail-row")
     ).length;
+
+  // keep filter input focused so keyboard shortcuts and typing work while results stream in
+  try {
+    const filterEl = document.getElementById("filterInput");
+    if (filterEl) filterEl.focus();
+  } catch (e) {}
+
+  // add click-to-copy on hotel name and address cells separately
+  (function addCopyOnClickSeparate() {
+    const cells = tr.querySelectorAll("td.copy-hotel");
+    const nameCell = cells[0];
+    const addressCell = cells[1];
+
+    const copyText = async (text, cell) => {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
+        // visual feedback: flash background on the clicked cell
+        if (cell) {
+          const orig = cell.style.backgroundColor || "";
+          cell.style.transition = "background-color 180ms ease";
+          cell.style.backgroundColor = "#fff8d6";
+          setTimeout(() => (cell.style.backgroundColor = orig), 700);
+        }
+      } catch (e) {
+        console.error("Copy failed", e);
+      }
+    };
+
+    if (nameCell)
+      nameCell.addEventListener("click", () =>
+        copyText(row.hotelName || "", nameCell)
+      );
+    if (addressCell)
+      addressCell.addEventListener("click", () =>
+        copyText(row.hotelAddress || "", addressCell)
+      );
+
+    // New: double-click either cell to copy both Hotel Name and Hotel Address
+    const copyBoth = async () => {
+      const text = `${row.hotelName || ""} - ${row.hotelAddress || ""}`.trim();
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
+        // flash both cells for feedback
+        const flash = (cell) => {
+          if (!cell) return;
+          const orig = cell.style.backgroundColor || "";
+          cell.style.transition = "background-color 180ms ease";
+          cell.style.backgroundColor = "#dff0d8";
+          setTimeout(() => (cell.style.backgroundColor = orig), 700);
+        };
+        flash(nameCell);
+        flash(addressCell);
+      } catch (e) {
+        console.error("Copy both failed", e);
+      }
+    };
+
+    if (nameCell) nameCell.addEventListener("dblclick", copyBoth);
+    if (addressCell) addressCell.addEventListener("dblclick", copyBoth);
+  })();
 }
 
 function shortenUrl(url) {
@@ -751,14 +778,28 @@ if (filterInput) {
       if (!q || name.includes(q)) {
         tr.style.display = ""; // show detail row as well
         const next = rows[i + 1];
-        if (next && next.classList && next.classList.contains("detail-row"))
+        if (next && next.classList && next.classList.contains("detail-row")) {
           next.style.display = "";
+        }
+        // if this is the first visible match, select it and scroll into view
+        if (visible === 0) {
+          // remove previous selection
+          const prev = document.querySelector("tr.selected-row");
+          if (prev) prev.classList.remove("selected-row");
+          tr.classList.add("selected-row");
+          try {
+            tr.scrollIntoView({ behavior: "smooth", block: "center" });
+          } catch (e) {}
+        }
         visible++;
       } else {
         tr.style.display = "none";
         const next = rows[i + 1];
         if (next && next.classList && next.classList.contains("detail-row"))
           next.style.display = "none";
+        // if this row was selected previously, remove selection
+        if (tr.classList && tr.classList.contains("selected-row"))
+          tr.classList.remove("selected-row");
       }
     }
     const resultsCountEl = document.getElementById("resultsCount");
@@ -832,3 +873,33 @@ function switchPage(page) {
 
 // Khởi tạo mặc định là trang A
 switchPage("SEARCHTAVILY");
+
+// Global keyboard shortcuts
+document.addEventListener("keydown", (e) => {
+  // Alt+S: focus the filter input (#filterInput). If missing, fallback to starting the search.
+  if (e.altKey && (e.key === "s" || e.key === "S")) {
+    const filterEl = document.getElementById("filterInput");
+    if (filterEl) {
+      e.preventDefault();
+      filterEl.focus();
+      if (typeof filterEl.select === "function") filterEl.select();
+    } else {
+      const searchBtn = document.getElementById("searchButton");
+      if (searchBtn && !searchBtn.disabled) {
+        e.preventDefault();
+        searchBtn.click();
+      }
+    }
+  }
+  // Alt+O to open-all for selected row
+  if (e.altKey && (e.key === "o" || e.key === "O")) {
+    const sel = document.querySelector("tr.selected-row");
+    if (sel) {
+      const openAll = sel.querySelector('button[data-action="open-all"]');
+      if (openAll && openAll.style.display !== "none" && !openAll.disabled) {
+        e.preventDefault();
+        openAll.click();
+      }
+    }
+  }
+});
