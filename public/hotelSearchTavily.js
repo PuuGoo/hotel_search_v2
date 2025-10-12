@@ -330,6 +330,8 @@ document.addEventListener("DOMContentLoaded", function () {
         status: statusLabel,
       });
       window.currentResults = results;
+      // sort lại theo trạng thái hiện tại
+      sortTable(currentSort, false);
       // save session: full rows + nextIndex
       try {
         const session = JSON.parse(
@@ -552,6 +554,176 @@ document.addEventListener("DOMContentLoaded", function () {
   window.stopSearch = () => {
     shouldStop = true;
   };
+
+  // Biến lưu trạng thái sort cho từng cột
+  let orderSortAsc = true;
+  let noSortAsc = true;
+  let pctSortAsc = true;
+  let statusSortAsc = true;
+  let nameSortAsc = true;
+  let linksSortAsc = true;
+  let currentSort = "order";
+
+  // Hàm sort cho từng cột
+  function sortTable(col, toggle = true) {
+    // Chỉ đảo chiều khi click icon, không đảo chiều khi thêm dòng mới
+    if (toggle) {
+      currentSort = col;
+      switch (col) {
+        case "order":
+          orderSortAsc = !orderSortAsc;
+          break;
+        case "no":
+          noSortAsc = !noSortAsc;
+          break;
+        case "pct":
+          pctSortAsc = !pctSortAsc;
+          break;
+        case "status":
+          statusSortAsc = !statusSortAsc;
+          break;
+        case "name":
+          nameSortAsc = !nameSortAsc;
+          break;
+        case "links":
+          linksSortAsc = !linksSortAsc;
+          break;
+      }
+    }
+    // Lấy chiều sort hiện tại
+    let asc = true;
+    switch (col) {
+      case "order":
+        asc = orderSortAsc;
+        break;
+      case "no":
+        asc = noSortAsc;
+        break;
+      case "pct":
+        asc = pctSortAsc;
+        break;
+      case "status":
+        asc = statusSortAsc;
+        break;
+      case "name":
+        asc = nameSortAsc;
+        break;
+      case "links":
+        asc = linksSortAsc;
+        break;
+    }
+    const results = window.currentResults || [];
+    results.sort((a, b) => {
+      switch (col) {
+        case "order":
+          return asc ? a.order - b.order : b.order - a.order;
+        case "no":
+          return asc
+            ? Number(a.hotelNo) - Number(b.hotelNo)
+            : Number(b.hotelNo) - Number(a.hotelNo);
+        case "pct":
+          return asc
+            ? a.percentage - b.percentage
+            : b.percentage - a.percentage;
+        case "status":
+          return asc
+            ? String(a.status).localeCompare(String(b.status))
+            : String(b.status).localeCompare(String(a.status));
+        case "name":
+          return asc
+            ? String(a.hotelName).localeCompare(String(b.hotelName))
+            : String(b.hotelName).localeCompare(String(a.hotelName));
+        case "links":
+          return asc
+            ? (a.matchedLinks?.length || 0) - (b.matchedLinks?.length || 0)
+            : (b.matchedLinks?.length || 0) - (a.matchedLinks?.length || 0);
+        default:
+          return 0;
+      }
+    });
+    window.currentResults = results;
+    currentPage = 1;
+    renderResultsPage();
+    updatePaginationControls();
+    updateSortIcons();
+  }
+
+  // Đổi icon sort cho từng cột
+  function updateSortIcons() {
+    const icons = {
+      order: document.getElementById("orderSortIcon"),
+      no: document.getElementById("noSortIcon"),
+      pct: document.getElementById("pctSortIcon"),
+      status: document.getElementById("statusSortIcon"),
+      name: document.getElementById("nameSortIcon"),
+      links: document.getElementById("linksSortIcon"),
+    };
+    Object.entries(icons).forEach(([col, el]) => {
+      if (!el) return;
+      el.textContent =
+        currentSort === col
+          ? {
+              order: orderSortAsc,
+              no: noSortAsc,
+              pct: pctSortAsc,
+              status: statusSortAsc,
+              name: nameSortAsc,
+              links: linksSortAsc,
+            }[col]
+            ? "▲"
+            : "▼"
+          : "▲";
+    });
+  }
+
+  // Gán sự kiện cho icon sort các cột
+  try {
+    document
+      .getElementById("orderSortIcon")
+      ?.addEventListener("click", () => sortTable("order", true));
+    document
+      .getElementById("noSortIcon")
+      ?.addEventListener("click", () => sortTable("no", true));
+    document
+      .getElementById("pctSortIcon")
+      ?.addEventListener("click", () => sortTable("pct", true));
+    document
+      .getElementById("statusSortIcon")
+      ?.addEventListener("click", () => sortTable("status", true));
+    document
+      .getElementById("nameSortIcon")
+      ?.addEventListener("click", () => sortTable("name", true));
+    document
+      .getElementById("linksSortIcon")
+      ?.addEventListener("click", () => sortTable("links", true));
+    updateSortIcons();
+  } catch (e) {}
+
+  // Biến lưu trạng thái sort hiện tại cho cột Order
+
+  // Sort Order column (tăng/giảm)
+  // function sortOrder(toggle = false) {
+  //   if (toggle) orderSortAsc = !orderSortAsc;
+  //   const results = window.currentResults || [];
+  //   results.sort((a, b) =>
+  //     orderSortAsc ? a.order - b.order : b.order - a.order
+  //   );
+  //   window.currentResults = results;
+  //   currentPage = 1;
+  //   renderResultsPage();
+  //   updatePaginationControls();
+  //   // Đổi icon
+  //   const icon = document.getElementById("orderSortIcon");
+  //   if (icon) icon.textContent = orderSortAsc ? "▲" : "▼";
+  // }
+
+  // // Gán sự kiện cho icon sort Order
+  // try {
+  //   const icon = document.getElementById("orderSortIcon");
+  //   if (icon) icon.addEventListener("click", () => sortOrder(true));
+  //   // Khởi tạo icon đúng trạng thái khi load
+  //   icon.textContent = orderSortAsc ? "▲" : "▼";
+  // } catch (e) {}
 });
 
 function updateCounter(counterEl, runCount, MAX_RUNS) {
@@ -647,6 +819,7 @@ function appendResultRow(row) {
 
   const pct = row.percentage || 0;
   const status = row.status || "No match";
+  const matchedLinksCount = row.matchedLinks ? row.matchedLinks.length : 0;
 
   tr.innerHTML = `
     <td>${escapeHtml(row.order)}</td>
@@ -664,6 +837,7 @@ function appendResultRow(row) {
     row.hotelAddress
   )}</td>
     <td class="matched-cell">${linksHtml}</td>
+    <td>${matchedLinksCount}</td>
     <td>
       <button class="btn btn-sm btn-outline-custom" data-action="open-all">Mở tất cả</button>
     </td>
@@ -679,7 +853,7 @@ function appendResultRow(row) {
   const uniqueUrls = Array.from(new Set(urlsRaw));
   // UI hints: hide/disable open-all when there are 0 or 1 links
   if (openAllBtn) {
-    if (uniqueUrls.length <= 1) {
+    if (uniqueUrls.length <= 0) {
       openAllBtn.style.display = "none";
       openAllBtn.disabled = true;
       openAllBtn.setAttribute("aria-hidden", "true");
@@ -984,7 +1158,7 @@ document.addEventListener("keydown", (e) => {
     }
   }
   // Alt+O to open-all for selected row
-  if (e.altKey && (e.key === "o" || e.key === "O")) {
+  if (e.altKey && (e.key === "a" || e.key === "A")) {
     const sel = document.querySelector("tr.selected-row");
     if (sel) {
       const openAll = sel.querySelector('button[data-action="open-all"]');
