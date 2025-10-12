@@ -10,9 +10,9 @@ document.addEventListener("DOMContentLoaded", function () {
   let shouldStop = false;
   let runCount = parseInt(localStorage.getItem("runCount") || "0");
   // Pagination settings
-  const PAGE_SIZES = [50, 100, 200];
-  let pageSize = parseInt(localStorage.getItem("tavily_pageSize") || "25");
-  if (!PAGE_SIZES.includes(pageSize)) pageSize = 25;
+  const PAGE_SIZES = [50, 100, 200, 500, 1000, 2000];
+  let pageSize = parseInt(localStorage.getItem("tavily_pageSize") || "2000");
+  if (!PAGE_SIZES.includes(pageSize)) pageSize = 2000;
   let currentPage = 1; // 1-based
   const counterEl = document.getElementById("counter");
   const resultsSection = document.getElementById("resultsSection");
@@ -535,7 +535,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (sizeSel) {
       sizeSel.value = String(pageSize);
       sizeSel.addEventListener("change", (e) =>
-        changePageSize(parseInt(e.target.value || "25"))
+        changePageSize(parseInt(e.target.value || "2000"))
       );
     }
     // initial render if there are restored results
