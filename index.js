@@ -128,17 +128,28 @@ async function searchWithRetry(query) {
       return result;
     } catch (error) {
       const status = error?.response?.status || 0;
+      console.log("Error object:", error);
+      console.log("Error status:", error?.response?.status);
+      console.log("Error response data:", error?.response?.data);
+      console.log("Error message:", error?.message);
 
-      // Kiểm tra xem lỗi có phải do hết quota không
-      if (status === 403 || status === 422 || status === 429) {
+      // Kiểm tra xem lỗi có phải do hết quota hoặc vượt giới hạn gói
+      if (
+        status === 403 ||
+        status === 422 ||
+        status === 429 ||
+        status === 500 ||
+        (error.message &&
+          error.message.includes("exceeds your plan's set usage limit"))
+      ) {
         console.warn(
           `API key ${
-            currentKeyIndex + 1
+            currentKeyTavilyIndex + 1
           } hết lượt trong tháng, chuyển key tiếp theo...`
         );
-        currentKeyIndex++;
+        currentKeyTavilyIndex++;
 
-        if (currentKeyIndex >= apiTavilyKeys.length) {
+        if (currentKeyTavilyIndex >= apiTavilyKeys.length) {
           throw new Error("Tất cả API key đã hết lượt trong tháng!");
         }
 
