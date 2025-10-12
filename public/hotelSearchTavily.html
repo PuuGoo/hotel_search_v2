@@ -153,6 +153,29 @@
       }
     </style>
     <style>
+      /* Simple modal styles */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.45);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+      }
+      .modal-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 18px;
+        width: 420px;
+        box-shadow: 0 12px 40px rgba(2,10,20,0.2);
+        font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto;
+      }
+      .modal-card h4 { margin:0 0 8px; }
+      .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:14px }
+      .modal-input { width:100%; padding:8px 10px; border-radius:8px; border:1px solid #e6eef0 }
+    </style>
+    <style>
       /* Styles for generated page buttons in .button-container */
       .button-container {
         display: flex;
@@ -229,6 +252,13 @@
                 >
                   Xóa kết quả
                 </button>
+                  <button
+                    id="resumeSessionButton"
+                    class="btn btn-outline-success btn-custom"
+                    style="display: none; margin-left:6px"
+                  >
+                    Resume phiên
+                  </button>
               </div>
             </div>
           </div>
@@ -317,5 +347,17 @@
 
     <script src="./libs/xlsx.full.min.js"></script>
     <script type="module" src="hotelSearchTavily.js"></script>
+    <!-- Confirm delete modal -->
+    <div id="confirmModal" class="modal-overlay">
+      <div class="modal-card">
+        <h4>Xác nhận xóa kết quả</h4>
+        <div style="color:#556;">Để xóa tất cả kết quả và session, vui lòng nhập <strong>Agree Delete</strong> vào ô bên dưới và nhấn Xác nhận.</div>
+        <input id="confirmInput" class="modal-input" placeholder="Gõ: Agree Delete" />
+        <div class="modal-actions">
+          <button id="confirmCancel" class="btn btn-outline-secondary">Hủy</button>
+          <button id="confirmOk" class="btn btn-danger">Xác nhận</button>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

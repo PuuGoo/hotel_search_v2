@@ -2,13 +2,22 @@ import axios from "https://cdn.jsdelivr.net/npm/axios@1.6.8/dist/esm/axios.min.j
 
 // Đảm bảo rằng script chỉ chạy khi DOM đã tải xong
 document.addEventListener("DOMContentLoaded", function () {
-  localStorage.removeItem("runCount");
+  // keep runCount but allow resume sessions
+  // localStorage.removeItem("runCount");
   let MAX_RUNS = 0;
   let isPaused = false;
   let isProcessingRow = false;
   let shouldStop = false;
   let runCount = parseInt(localStorage.getItem("runCount") || "0");
   const counterEl = document.getElementById("counter");
+  // If there's no saved session, clear any stale runCount so page doesn't show e.g. 10/0
+  try {
+    const s = localStorage.getItem("tavily_session");
+    if (!s) {
+      localStorage.removeItem("runCount");
+      runCount = 0;
+    }
+  } catch (e) {}
   // Cập nhật giao diện ban đầu
   updateCounter(counterEl, runCount, MAX_RUNS);
 
@@ -26,28 +35,15 @@ document.addEventListener("DOMContentLoaded", function () {
       // Disable button and show spinner
       if (searchBtn) searchBtn.disabled = true;
       if (spinnerEl) spinnerEl.style.display = "flex";
-      if (pauseBtn) {
-        pauseBtn.style.display = "inline-block";
-        pauseBtn.textContent = "Tạm dừng";
-      }
-      if (progressContainer) progressContainer.style.display = "block";
       const fileInput = document.getElementById("fileInput");
-      if (fileInput.files.length === 0) {
+      if (!fileInput || fileInput.files.length === 0) {
         alert("Vui lòng chọn một file Excel!");
+        if (searchBtn) searchBtn.disabled = false;
+        if (spinnerEl) spinnerEl.style.display = "none";
         return;
       }
-
       const file = fileInput.files[0];
       const reader = new FileReader();
-
-      // const subscriptionKey = document.getElementById("subscriptionKey").value;
-      // const subscriptionKey = document.getElementById("subscriptionKey").value;
-
-      // Cập nhật endpoint cho Brave Search API
-      // const endpoint = "http://127.0.0.1:8080/search";
-      // const endpoint = "https://searxng-production-3523.up.railway.app/search";
-      const endpoint = "/api/search";
-
       reader.onload = async (e) => {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: "array" });
@@ -59,238 +55,296 @@ document.addEventListener("DOMContentLoaded", function () {
         );
         jsonData.shift();
         console.log(jsonData.length);
-        const results = [];
-        let order = 1;
-        let currentIndex = 0;
-        MAX_RUNS = jsonData.length;
-        updateCounter(counterEl, runCount, MAX_RUNS);
-        // Clear any previous live results
-        clearResultsTable();
-        for (let rowIndex = 0; rowIndex < jsonData.length; rowIndex++) {
-          // Respect pause flag
-          while (isPaused) {
-            await new Promise((r) => setTimeout(r, 200));
-          }
-          if (shouldStop) break;
-          const row = jsonData[rowIndex];
-          // mark processing start for this iteration
-          isProcessingRow = true;
-          // await new Promise((resolve) => setTimeout(resolve, 10000)); // Delay 15s mỗi lần
-          let [hotelNo, hotelName, hotelAddress, hotelUrlType] = row;
-          if (!hotelName || !hotelAddress) {
-            isProcessingRow = false;
-            continue;
-          }
-
-          hotelName = hotelName.replace(/[^\x00-\x7F]/g, "");
-          const hotelNameArray = hotelName
-            .split(" ")
-            .map((part) =>
-              part
-                .replace(",", "")
-                .replace("(", "")
-                .replace(")", "")
-                .toLowerCase()
-            );
-          let query = "";
-          if (hotelUrlType == "CTrip SuperAgg") {
-            query = `${hotelName} ${hotelAddress} trip`; // Điều kiện tìm kiếm
-          } else {
-            query = `${hotelName} ${hotelAddress}`; // Điều kiện tìm kiếm
-          }
-          console.log(query);
-
-          let searchURL;
-
-          if (window.location.hostname === "localhost") {
-            searchURL = `http://localhost:3000/searchApiTavily?q=${encodeURIComponent(
-              query
-            )}`;
-          } else {
-            searchURL = `/searchApiTavily?q=${encodeURIComponent(query)}`;
-          }
-
-          let matchedLink = [];
-
-          try {
-            // Thay thế axios bằng fetch và sử dụng Brave API
-            const response = await axios.get(searchURL);
-
-            const data = response.data;
-            console.log(data);
-
-            // Nếu không có lỗi và có data: (runCount will be updated after we push the result to ensure UI/download consistency)
-
-            // Lấy kết quả từ Brave Search API
-            const resultsFromBrave = data.results;
-
-            if (resultsFromBrave && resultsFromBrave.length > 0) {
-              let resultsFromBraveArray = [];
-              for (let result of resultsFromBrave) {
-                const pageTitle = (result.title || "").toLowerCase();
-                const pageUrl = result.url || "";
-                const pageContent = (
-                  result.content ||
-                  result.rawContent ||
-                  ""
-                ).toLowerCase();
-                const apiScore =
-                  typeof result.score === "number" ? result.score : 0;
-                const isMatch = isHotelNameInPage(
-                  hotelNameArray,
-                  pageTitle,
-                  pageUrl,
-                  pageContent,
-                  apiScore
-                );
-
-                if (isMatch.status && pageUrl.includes(".com")) {
-                  resultsFromBraveArray.push({
-                    percentage: isMatch.percentage,
-                    matchedLink: pageUrl,
-                  });
+        // detect saved session and decide startIndex
+        let startIndex = 0;
+        try {
+          const saved = JSON.parse(
+            localStorage.getItem("tavily_session") || "null"
+          );
+          if (
+            saved &&
+            typeof saved.nextIndex === "number" &&
+            saved.nextIndex > 0 &&
+            Array.isArray(saved.allRows)
+          ) {
+            const n = Math.min(saved.nextIndex, jsonData.length);
+            // compare first n rows crudely to ensure same file/order
+            let match = true;
+            for (let i = 0; i < n; i++) {
+              try {
+                if (
+                  JSON.stringify(saved.allRows[i]) !==
+                  JSON.stringify(jsonData[i])
+                ) {
+                  match = false;
+                  break;
                 }
+              } catch (e) {
+                match = false;
+                break;
               }
-
-              const maxPercentageResult = resultsFromBraveArray.reduce(
-                (max, item) => {
-                  return item.percentage > max.percentage ? item : max;
-                },
-                { percentage: -Infinity }
-              );
-
-              // resultsFromBingArray = resultsFromBingArray
-              //   .filter(
-              //     (row) =>
-              //       row.percentage == maxPercentageResult.percentage &&
-              //       !row.matchedLink.includes("tripadvisor")
-              //   )
-              //   .sort((a, b) => {
-              //     if (
-              //       a.matchedLink.includes("agoda") &&
-              //       !b.matchedLink.includes("agoda")
-              //     )
-              //       return -1; // Ưu tiên link a
-              //     if (
-              //       !a.matchedLink.includes("agoda") &&
-              //       b.matchedLink.includes("agoda")
-              //     )
-              //       return 1; // Ưu tiên link b
-              //     return 0; // Giữ nguyên thứ tự link
-              //   });
-
-              resultsFromBraveArray = resultsFromBraveArray
-                .filter(
-                  (row) =>
-                    row.percentage == maxPercentageResult.percentage &&
-                    !row.matchedLink.includes("tripadvisor") &&
-                    !row.matchedLink.includes("makemytrip")
-                )
-                .sort((a, b) => {
-                  const getPriority = (link) => {
-                    if (link.includes("trip")) return 1; // Trip ưu tiên thứ 3
-                    if (link.includes("agoda")) return 2; // Agoda ưu tiên cao nhất
-                    if (link.includes("booking")) return 3; // Booking ưu tiên thứ 2
-                    if (link.includes("hotels")) return 4; // Hotels ưu tiên thứ 3
-                    if (link.includes("hotel")) return 5; // Hotel ưu tiên thứ 3
-                    if (link.includes("trivago")) return 6; // Trivago ưu tiên thứ 3
-                    if (link.includes("expedia")) return 7; // Expedia ưu tiên thứ 3
-                    if (link.includes("zenhotels")) return 8; // Expedia ưu tiên thứ 3
-                    if (link.includes("skyscanner")) return 9; // Expedia ưu tiên thứ 3
-                    if (link.includes("airpaz")) return 10; // Expedia ưu tiên thứ 3
-                    if (link.includes("readytotrip")) return 11; // Expedia ưu tiên thứ 3
-                    if (link.includes("lodging-world")) return 12; // Expedia ưu tiên thứ 3
-                    if (link.includes("yatra")) return 13; // Expedia ưu tiên thứ 3
-                    if (link.includes("rentbyowner")) return 14; // Expedia ưu tiên thứ 3
-                    if (link.includes("goibibo")) return 15; // Expedia ưu tiên thứ 3
-                    if (link.includes("laterooms")) return 16; // Expedia ưu tiên thứ 3
-                    if (link.includes("tiket")) return 17; // Expedia ưu tiên thứ 3
-                    return 18; // Các trang khác ưu tiên thấp hơn
-                  };
-
-                  return (
-                    getPriority(a.matchedLink) - getPriority(b.matchedLink)
-                  );
-                });
-
-              // keep matched links along with their percentages
-              matchedLink = resultsFromBraveArray.map(
-                ({ percentage, matchedLink }) => ({
-                  url: matchedLink,
-                  percentage,
-                })
-              );
             }
-          } catch (error) {
-            console.log("Lỗi khi tìm kiếm:", error);
-          }
-
-          // compute percentage for UI convenience: max percentage among matched links
-          const maxPct =
-            matchedLink && matchedLink.length
-              ? Math.max(...matchedLink.map((m) => m.percentage || 0))
-              : 0;
-          const statusLabel =
-            matchedLink && matchedLink.length ? "Matched" : "No match";
-          results.push({
-            order: order++,
-            hotelNo,
-            hotelName,
-            hotelAddress,
-            matchedLinks: matchedLink
-              ? matchedLink.map((m) => ({
-                  url: m.url,
-                  percentage: m.percentage,
-                }))
-              : [],
-            percentage: Math.round(maxPct),
-            status: statusLabel,
-          });
-          // keep a live copy on window so pause handler can download partial results
-          window.currentResults = results;
-          // Now update runCount so displayed count matches number of pushed results
-          runCount++;
-          localStorage.setItem("runCount", runCount);
-          updateCounter(counterEl, runCount, MAX_RUNS);
-          // Append to live table immediately
-          appendResultRow(results[results.length - 1]);
-          currentIndex++;
-          // update progress
-          const pct = Math.round((currentIndex / MAX_RUNS) * 100);
-          if (progressBar) progressBar.style.width = pct + "%";
-          if (progressText)
-            progressText.textContent = `${pct}% (${currentIndex}/${MAX_RUNS})`;
-          console.log("Dong thu:", currentIndex, "hoan thanh.");
-          // mark processing finished for this iteration
-          isProcessingRow = false;
-        }
-
-        if (results.length > 0) {
-          // store on window for download/inspection
-          window.currentResults = results;
-          setupDownloadButton(results); // Hiển thị nút tải khi có kết quả
-          if (clearBtn) {
-            clearBtn.style.display = "inline-block";
-            clearBtn.onclick = () => {
+            if (match) {
+              startIndex = saved.nextIndex;
+              // restore previous results into window and table
+              window.currentResults = saved.results || [];
               clearResultsTable();
-              window.currentResults = [];
-              clearBtn.style.display = "none";
-              downloadBtn.style.display = "none";
-            };
+              (window.currentResults || []).forEach((r) => appendResultRow(r));
+              // restore runCount from saved results length
+              runCount =
+                saved.results && saved.results.length
+                  ? saved.results.length
+                  : runCount;
+              updateCounter(counterEl, runCount, jsonData.length);
+            } else {
+              // different file -- overwrite session later
+              startIndex = 0;
+            }
           }
-        } else {
-          alert("Không tìm thấy kết quả nào khớp với tên khách sạn.");
+        } catch (e) {
+          startIndex = 0;
         }
 
-        // Re-enable button and hide spinner
-        if (searchBtn) searchBtn.disabled = false;
-        if (spinnerEl) spinnerEl.style.display = "none";
-        if (pauseBtn) pauseBtn.style.display = "none";
-        if (progressContainer) progressContainer.style.display = "none";
+        // save allRows into session so resume can continue without re-upload (update allRows and maxRuns)
+        try {
+          const sess = JSON.parse(
+            localStorage.getItem("tavily_session") || "{}"
+          );
+          sess.allRows = jsonData;
+          sess.maxRuns = jsonData.length;
+          // if we didn't restore results above, ensure sess.results is at least empty array
+          sess.results = sess.results || [];
+          localStorage.setItem("tavily_session", JSON.stringify(sess));
+        } catch (e) {
+          /* ignore */
+        }
+
+        // start processing from the decided index
+        await processRows(jsonData, startIndex);
       };
 
       reader.readAsArrayBuffer(file);
     });
+
+  // Process rows helper used for both fresh runs and resume
+  async function processRows(jsonData, startIndex = 0) {
+    const searchBtn = document.getElementById("searchButton");
+    const spinnerEl = document.getElementById("spinner");
+    const downloadBtn = document.getElementById("downloadCSVButton");
+    const clearBtn = document.getElementById("clearResultsButton");
+    const pauseBtn = document.getElementById("pauseResumeButton");
+    const progressContainer = document.getElementById("progressContainer");
+    const progressBar = document.getElementById("progressBar");
+    const progressText = document.getElementById("progressText");
+
+    const results =
+      window.currentResults && window.currentResults.length
+        ? window.currentResults
+        : [];
+    let order = results.length ? results[results.length - 1].order + 1 : 1;
+    let currentIndex = results.length || 0;
+    MAX_RUNS = jsonData.length;
+    updateCounter(counterEl, runCount, MAX_RUNS);
+    // If starting fresh, clear table
+    if (startIndex === 0) clearResultsTable();
+
+    for (let rowIndex = startIndex; rowIndex < jsonData.length; rowIndex++) {
+      while (isPaused) {
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      if (shouldStop) break;
+      const row = jsonData[rowIndex];
+      isProcessingRow = true;
+      let [hotelNo, hotelName, hotelAddress, hotelUrlType] = row;
+      if (!hotelName || !hotelAddress) {
+        isProcessingRow = false;
+        continue;
+      }
+
+      hotelName = hotelName.replace(/[^\x00-\x7F]/g, "");
+      const hotelNameArray = hotelName
+        .split(" ")
+        .map((part) =>
+          part.replace(",", "").replace("(", "").replace(")", "").toLowerCase()
+        );
+      let query =
+        hotelUrlType == "CTrip SuperAgg"
+          ? `${hotelName} ${hotelAddress} trip`
+          : `${hotelName} ${hotelAddress}`;
+
+      let searchURL =
+        window.location.hostname === "localhost"
+          ? `http://localhost:3000/searchApiTavily?q=${encodeURIComponent(
+              query
+            )}`
+          : `/searchApiTavily?q=${encodeURIComponent(query)}`;
+
+      let matchedLink = [];
+      try {
+        const response = await axios.get(searchURL);
+        const data = response.data;
+        const resultsFromBrave = data.results;
+        if (resultsFromBrave && resultsFromBrave.length > 0) {
+          let resultsFromBraveArray = [];
+          for (let result of resultsFromBrave) {
+            const pageTitle = (result.title || "").toLowerCase();
+            const pageUrl = result.url || "";
+            const pageContent = (
+              result.content ||
+              result.rawContent ||
+              ""
+            ).toLowerCase();
+            const apiScore =
+              typeof result.score === "number" ? result.score : 0;
+            const isMatch = isHotelNameInPage(
+              hotelNameArray,
+              pageTitle,
+              pageUrl,
+              pageContent,
+              apiScore
+            );
+            if (isMatch.status && pageUrl.includes(".com")) {
+              resultsFromBraveArray.push({
+                percentage: isMatch.percentage,
+                matchedLink: pageUrl,
+              });
+            }
+          }
+          const maxPercentageResult = resultsFromBraveArray.reduce(
+            (max, item) => (item.percentage > max.percentage ? item : max),
+            { percentage: -Infinity }
+          );
+          resultsFromBraveArray = resultsFromBraveArray
+            .filter(
+              (row) =>
+                row.percentage == maxPercentageResult.percentage &&
+                !row.matchedLink.includes("tripadvisor") &&
+                !row.matchedLink.includes("makemytrip")
+            )
+            .sort((a, b) => {
+              const getPriority = (link) => {
+                if (link.includes("agoda")) return 2;
+                if (link.includes("booking")) return 3;
+                return 18;
+              };
+              return getPriority(a.matchedLink) - getPriority(b.matchedLink);
+            });
+          matchedLink = resultsFromBraveArray.map(
+            ({ percentage, matchedLink }) => ({ url: matchedLink, percentage })
+          );
+        }
+      } catch (error) {
+        console.log("Lỗi khi tìm kiếm:", error);
+      }
+
+      const maxPct =
+        matchedLink && matchedLink.length
+          ? Math.max(...matchedLink.map((m) => m.percentage || 0))
+          : 0;
+      const statusLabel =
+        matchedLink && matchedLink.length ? "Matched" : "No match";
+      results.push({
+        order: order++,
+        hotelNo,
+        hotelName,
+        hotelAddress,
+        matchedLinks: matchedLink
+          ? matchedLink.map((m) => ({ url: m.url, percentage: m.percentage }))
+          : [],
+        percentage: Math.round(maxPct),
+        status: statusLabel,
+      });
+      window.currentResults = results;
+      // save session: full rows + nextIndex
+      try {
+        const session = JSON.parse(
+          localStorage.getItem("tavily_session") || "{}"
+        );
+        session.results = window.currentResults;
+        session.nextIndex = rowIndex + 1;
+        session.allRows = jsonData;
+        session.maxRuns = MAX_RUNS;
+        localStorage.setItem("tavily_session", JSON.stringify(session));
+      } catch (e) {
+        console.warn("Could not save session:", e);
+      }
+
+      runCount++;
+      localStorage.setItem("runCount", runCount);
+      updateCounter(counterEl, runCount, MAX_RUNS);
+      appendResultRow(results[results.length - 1]);
+      currentIndex++;
+      const pct = Math.round((currentIndex / MAX_RUNS) * 100);
+      if (progressBar) progressBar.style.width = pct + "%";
+      if (progressText)
+        progressText.textContent = `${pct}% (${currentIndex}/${MAX_RUNS})`;
+      console.log("Dong thu:", currentIndex, "hoan thanh.");
+      isProcessingRow = false;
+    }
+
+    if (results.length > 0) {
+      window.currentResults = results;
+      // Do NOT remove tavily_session on completion — keep session to allow later resume
+      try {
+        localStorage.setItem("runCount", runCount);
+        updateCounter(counterEl, runCount, MAX_RUNS);
+      } catch (e) {}
+      setupDownloadButton(results);
+      if (clearBtn) {
+        clearBtn.style.display = "inline-block";
+        clearBtn.onclick = () => {
+          // show modal
+          const modal = document.getElementById("confirmModal");
+          const input = document.getElementById("confirmInput");
+          const ok = document.getElementById("confirmOk");
+          const cancel = document.getElementById("confirmCancel");
+          if (!modal || !input || !ok || !cancel) return;
+          input.value = "";
+          modal.style.display = "flex";
+          input.focus();
+          const cleanup = () => {
+            modal.style.display = "none";
+            ok.onclick = null;
+            cancel.onclick = null;
+          };
+          cancel.onclick = () => {
+            cleanup();
+          };
+          ok.onclick = () => {
+            if (input.value === "Agree Delete") {
+              clearResultsTable();
+              window.currentResults = [];
+              clearBtn.style.display = "none";
+              downloadBtn.style.display = "none";
+              try {
+                localStorage.removeItem("tavily_session");
+                localStorage.removeItem("runCount");
+                runCount = 0;
+                updateCounter(counterEl, 0, 0);
+                const resumeBtn = document.getElementById(
+                  "resumeSessionButton"
+                );
+                if (resumeBtn) resumeBtn.style.display = "none";
+              } catch (e) {}
+              cleanup();
+            } else {
+              alert(
+                'Xóa đã bị hủy. Bạn phải gõ đúng "Agree Delete" để xác nhận.'
+              );
+              input.focus();
+            }
+          };
+        };
+      }
+    } else {
+      alert("Không tìm thấy kết quả nào khớp với tên khách sạn.");
+    }
+
+    if (searchBtn) searchBtn.disabled = false;
+    if (spinnerEl) spinnerEl.style.display = "none";
+    if (pauseBtn) pauseBtn.style.display = "none";
+    if (progressContainer) progressContainer.style.display = "none";
+  }
 
   // Pause/Resume handling
   const pauseBtnGlobal = document.getElementById("pauseResumeButton");
@@ -309,18 +363,33 @@ document.addEventListener("DOMContentLoaded", function () {
           while (isProcessingRow && Date.now() - waitStart < waitTimeout) {
             await new Promise((r) => setTimeout(r, 100));
           }
+          // ensure download button is visible
+          const downloadBtnEl = document.getElementById("downloadCSVButton");
+          if (downloadBtnEl) downloadBtnEl.style.display = "inline-block";
           // prepare filename containing timestamp and current count
           const now = new Date();
           const ts = now.toISOString().replace(/[:\.]/g, "-");
           const count = (window.currentResults || []).length || 0;
           const filename = `hotel_search_partial_${count}_${ts}.csv`;
           try {
-            const resultsToSave = window.currentResults || [];
+            // capture a snapshot of current results so manual download gets the paused set
+            const resultsToSave = JSON.parse(
+              JSON.stringify(window.currentResults || [])
+            );
             if (resultsToSave.length > 0) {
-              downloadCSV(resultsToSave, filename);
+              const downloadBtnEl =
+                document.getElementById("downloadCSVButton");
+              if (downloadBtnEl) {
+                downloadBtnEl.style.display = "inline-block";
+                // bind a one-time click handler to download this snapshot with the filename
+                downloadBtnEl.onclick = () =>
+                  downloadCSV(resultsToSave, filename);
+                // also store filename in dataset for visibility/debug
+                downloadBtnEl.dataset.lastFilename = filename;
+              }
             }
           } catch (e) {
-            console.error("Lỗi khi tải partial CSV:", e);
+            console.error("Lỗi khi chuẩn bị partial CSV:", e);
           }
         })();
       } else {
@@ -330,6 +399,47 @@ document.addEventListener("DOMContentLoaded", function () {
         if (spinnerEl) spinnerEl.style.opacity = "1";
       }
     });
+  }
+  // Auto-resume if a saved session with allRows exists
+  try {
+    const saved = JSON.parse(localStorage.getItem("tavily_session") || "null");
+    if (
+      saved &&
+      Array.isArray(saved.allRows) &&
+      typeof saved.nextIndex === "number" &&
+      saved.nextIndex > 0
+    ) {
+      // restore previous results into window and table
+      window.currentResults = saved.results || [];
+      clearResultsTable();
+      (window.currentResults || []).forEach((r) => appendResultRow(r));
+      runCount =
+        saved.results && saved.results.length ? saved.results.length : runCount;
+      MAX_RUNS = saved.maxRuns || (saved.allRows && saved.allRows.length) || 0;
+      updateCounter(counterEl, runCount, MAX_RUNS);
+
+      // prepare UI for running
+      const searchBtn = document.getElementById("searchButton");
+      const spinnerEl = document.getElementById("spinner");
+      const pauseBtn = document.getElementById("pauseResumeButton");
+      if (searchBtn) searchBtn.disabled = true;
+      if (spinnerEl) spinnerEl.style.display = "flex";
+      if (pauseBtn) {
+        pauseBtn.style.display = "inline-block";
+        pauseBtn.textContent = "Tạm dừng";
+      }
+
+      // start processing automatically from saved.nextIndex
+      (async () => {
+        try {
+          await processRows(saved.allRows, saved.nextIndex);
+        } catch (e) {
+          console.error("Auto-resume failed", e);
+        }
+      })();
+    }
+  } catch (e) {
+    /* ignore */
   }
 
   // small helper to stop if needed in future
