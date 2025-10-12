@@ -9,7 +9,19 @@ document.addEventListener("DOMContentLoaded", function () {
   let isProcessingRow = false;
   let shouldStop = false;
   let runCount = parseInt(localStorage.getItem("runCount") || "0");
+  // Pagination settings
+  const PAGE_SIZES = [50, 100, 200];
+  let pageSize = parseInt(localStorage.getItem("tavily_pageSize") || "25");
+  if (!PAGE_SIZES.includes(pageSize)) pageSize = 25;
+  let currentPage = 1; // 1-based
   const counterEl = document.getElementById("counter");
+  const resultsSection = document.getElementById("resultsSection");
+  function showResultsSection() {
+    if (resultsSection) resultsSection.style.display = "";
+  }
+  function hideResultsSection() {
+    if (resultsSection) resultsSection.style.display = "none";
+  }
   // If there's no saved session, clear any stale runCount so page doesn't show e.g. 10/0
   try {
     const s = localStorage.getItem("tavily_session");
@@ -96,6 +108,7 @@ document.addEventListener("DOMContentLoaded", function () {
               startIndex = saved.nextIndex;
               // restore previous results into window and table
               window.currentResults = saved.results || [];
+              showResultsSection();
               clearResultsTable();
               (window.currentResults || []).forEach((r) => appendResultRow(r));
               // restore runCount from saved results length
@@ -127,12 +140,60 @@ document.addEventListener("DOMContentLoaded", function () {
           /* ignore */
         }
 
+        // show results area immediately when starting a run
+        showResultsSection();
         // start processing from the decided index
         await processRows(jsonData, startIndex);
       };
 
       reader.readAsArrayBuffer(file);
     });
+
+  // Pagination helpers
+  function totalPages() {
+    const results = window.currentResults || [];
+    return Math.max(1, Math.ceil(results.length / pageSize));
+  }
+
+  function goToPage(n) {
+    const tp = totalPages();
+    if (n < 1) n = 1;
+    if (n > tp) n = tp;
+    currentPage = n;
+    renderResultsPage();
+    updatePaginationControls();
+  }
+
+  function changePageSize(size) {
+    pageSize = size;
+    localStorage.setItem("tavily_pageSize", String(pageSize));
+    currentPage = 1;
+    renderResultsPage();
+    updatePaginationControls();
+  }
+
+  function renderResultsPage() {
+    const body = document.getElementById("resultsBody");
+    if (!body) return;
+    body.innerHTML = "";
+    const results = window.currentResults || [];
+    const start = (currentPage - 1) * pageSize;
+    const pageRows = results.slice(start, start + pageSize);
+    for (const r of pageRows) {
+      // reuse appendResultRow but it appends directly; instead create a temporary container
+      appendResultRow(r);
+    }
+  }
+
+  function updatePaginationControls() {
+    const pageInfo = document.getElementById("pageInfo");
+    const prevBtn = document.getElementById("pagePrev");
+    const nextBtn = document.getElementById("pageNext");
+    if (!pageInfo || !prevBtn || !nextBtn) return;
+    pageInfo.textContent = `Trang ${currentPage}/${totalPages()}`;
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = currentPage >= totalPages();
+  }
 
   // Process rows helper used for both fresh runs and resume
   async function processRows(jsonData, startIndex = 0) {
@@ -286,7 +347,13 @@ document.addEventListener("DOMContentLoaded", function () {
       runCount++;
       localStorage.setItem("runCount", runCount);
       updateCounter(counterEl, runCount, MAX_RUNS);
-      appendResultRow(results[results.length - 1]);
+      // Append to DOM only if the new row is within the current page range
+      const newIndex = results.length - 1; // 0-based in results
+      const start = (currentPage - 1) * pageSize;
+      const end = start + pageSize - 1;
+      if (newIndex >= start && newIndex <= end) {
+        appendResultRow(results[results.length - 1]);
+      }
       currentIndex++;
       const pct = Math.round((currentIndex / MAX_RUNS) * 100);
       if (progressBar) progressBar.style.width = pct + "%";
@@ -298,6 +365,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (results.length > 0) {
       window.currentResults = results;
+      showResultsSection();
       // Do NOT remove tavily_session on completion — keep session to allow later resume
       try {
         localStorage.setItem("runCount", runCount);
@@ -325,9 +393,10 @@ document.addEventListener("DOMContentLoaded", function () {
             cleanup();
           };
           ok.onclick = () => {
-            if (input.value === "Agree Delete") {
+            if (input.value === "Đồng Ý Xóa") {
               clearResultsTable();
               window.currentResults = [];
+              hideResultsSection();
               clearBtn.style.display = "none";
               downloadBtn.style.display = "none";
               try {
@@ -343,7 +412,7 @@ document.addEventListener("DOMContentLoaded", function () {
               cleanup();
             } else {
               alert(
-                'Xóa đã bị hủy. Bạn phải gõ đúng "Agree Delete" để xác nhận.'
+                'Xóa đã bị hủy. Bạn phải gõ đúng "Đồng Ý Xóa" để xác nhận.'
               );
               input.focus();
             }
@@ -455,6 +524,26 @@ document.addEventListener("DOMContentLoaded", function () {
   } catch (e) {
     /* ignore */
   }
+
+  // pagination control wiring
+  try {
+    const prev = document.getElementById("pagePrev");
+    const next = document.getElementById("pageNext");
+    const sizeSel = document.getElementById("pageSizeSelect");
+    if (prev) prev.addEventListener("click", () => goToPage(currentPage - 1));
+    if (next) next.addEventListener("click", () => goToPage(currentPage + 1));
+    if (sizeSel) {
+      sizeSel.value = String(pageSize);
+      sizeSel.addEventListener("change", (e) =>
+        changePageSize(parseInt(e.target.value || "25"))
+      );
+    }
+    // initial render if there are restored results
+    if (window.currentResults && window.currentResults.length) {
+      renderResultsPage();
+      updatePaginationControls();
+    }
+  } catch (e) {}
 
   // small helper to stop if needed in future
   window.stopSearch = () => {

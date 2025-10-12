@@ -247,7 +247,7 @@
   <body>
     <div class="container app-wrapper">
       <header>
-        <h1>TÌM KIẾM KHÁCH SẠN - MASTER</h1>
+        <h1>TÌM KIẾM KHÁCH SẠN - Child</h1>
         <div class="subtitle">
           Import file Excel (No, Child's Name, Child's Address). Kết quả sẽ
           hiển thị trực tiếp phía dưới.
@@ -348,8 +348,8 @@
           </div>
         </div>
 
-        <!-- Live results -->
-        <div class="results-card">
+  <!-- Live results -->
+  <div id="resultsSection" class="results-card" style="display:none">
           <div class="card-panel results-card">
         <div class="results-inner">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -381,6 +381,19 @@
                 <tbody id="resultsBody"></tbody>
               </table>
             </div>
+            <!-- pagination controls (moved here, right-aligned) -->
+            <div style="display:flex;justify-content:flex-end;align-items:center;margin-top:8px;gap:8px">
+              <button id="pagePrev" class="btn btn-outline-custom btn-sm">« Prev</button>
+              <div id="pageInfo" style="min-width:110px;text-align:center">Trang 1/1</div>
+              <button id="pageNext" class="btn btn-outline-custom btn-sm">Next »</button>
+              <label style="margin:0 6px 0 12px;color:var(--muted)">Hiển thị</label>
+              <select id="pageSizeSelect" class="form-control" style="width:90px;padding:6px;border-radius:8px">
+                <option value="25" >25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+              </select>
+            </div>
             </div>
           </div>
         </div>
@@ -395,8 +408,8 @@
     <div id="confirmModal" class="modal-overlay">
       <div class="modal-card">
         <h4>Xác nhận xóa kết quả</h4>
-        <div style="color:#556;">Để xóa tất cả kết quả và session, vui lòng nhập <strong>Agree Delete</strong> vào ô bên dưới và nhấn Xác nhận.</div>
-        <input id="confirmInput" class="modal-input" placeholder="Gõ: Agree Delete" />
+        <div style="color:#556;">Để xóa tất cả kết quả và session, vui lòng nhập <strong>Đồng Ý Xóa</strong> vào ô bên dưới và nhấn Xác nhận.</div>
+        <input id="confirmInput" class="modal-input" placeholder="Gõ: Đồng Ý Xóa" />
         <div class="modal-actions">
           <button id="confirmCancel" class="btn btn-outline-secondary">Hủy</button>
           <button id="confirmOk" class="btn btn-danger">Xác nhận</button>
