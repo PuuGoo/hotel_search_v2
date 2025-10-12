@@ -501,6 +501,9 @@ document.addEventListener("DOMContentLoaded", function () {
       MAX_RUNS = saved.maxRuns || (saved.allRows && saved.allRows.length) || 0;
       updateCounter(counterEl, runCount, MAX_RUNS);
 
+      // Hiển thị bảng kết quả live khi resume hoặc reload
+      showResultsSection();
+
       // prepare UI for running
       const searchBtn = document.getElementById("searchButton");
       const spinnerEl = document.getElementById("spinner");
