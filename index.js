@@ -267,10 +267,10 @@ app.get("/searchApiGo", checkAuthenticated, async (req, res) => {
     });
   }
 });
-app.get("/searchTavily", checkAuthenticated, (req, res) => {
+app.get("/searchTavily", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "hotelSearchTavily.html"));
 });
-app.get("/searchApiTavily", checkAuthenticated, async (req, res) => {
+app.get("/searchApiTavily", async (req, res) => {
   console.log("Query string nhận được:", req.query); // 👈 dòng này để debug
   const query = req.query.q; // Default query if none provided
 

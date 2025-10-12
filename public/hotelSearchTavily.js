@@ -12,6 +12,13 @@ document.addEventListener("DOMContentLoaded", function () {
   document
     .getElementById("searchButton")
     .addEventListener("click", async () => {
+      const searchBtn = document.getElementById("searchButton");
+      const spinnerEl = document.getElementById("spinner");
+      const downloadBtn = document.getElementById("downloadCSVButton");
+      const clearBtn = document.getElementById("clearResultsButton");
+      // Disable button and show spinner
+      if (searchBtn) searchBtn.disabled = true;
+      if (spinnerEl) spinnerEl.style.display = "flex";
       const fileInput = document.getElementById("fileInput");
       if (fileInput.files.length === 0) {
         alert("Vui lòng chọn một file Excel!");
@@ -44,8 +51,9 @@ document.addEventListener("DOMContentLoaded", function () {
         let order = 1;
         let currentIndex = 0;
         MAX_RUNS = jsonData.length;
-
         updateCounter(counterEl, runCount, MAX_RUNS);
+        // Clear any previous live results
+        clearResultsTable();
         for (let row of jsonData) {
           // await new Promise((resolve) => setTimeout(resolve, 10000)); // Delay 15s mỗi lần
           let [hotelNo, hotelName, hotelAddress, hotelUrlType] = row;
@@ -187,15 +195,32 @@ document.addEventListener("DOMContentLoaded", function () {
             hotelAddress,
             matchedLinks: [...matchedLink],
           });
+          // Append to live table immediately
+          appendResultRow(results[results.length - 1]);
           currentIndex++;
           console.log("Dong thu:", currentIndex, "hoan thanh.");
         }
 
         if (results.length > 0) {
+          // store on window for download/inspection
+          window.currentResults = results;
           setupDownloadButton(results); // Hiển thị nút tải khi có kết quả
+          if (clearBtn) {
+            clearBtn.style.display = "inline-block";
+            clearBtn.onclick = () => {
+              clearResultsTable();
+              window.currentResults = [];
+              clearBtn.style.display = "none";
+              downloadBtn.style.display = "none";
+            };
+          }
         } else {
           alert("Không tìm thấy kết quả nào khớp với tên khách sạn.");
         }
+
+        // Re-enable button and hide spinner
+        if (searchBtn) searchBtn.disabled = false;
+        if (spinnerEl) spinnerEl.style.display = "none";
       };
 
       reader.readAsArrayBuffer(file);
@@ -251,6 +276,45 @@ function downloadCSV(results) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+// --- Live table helpers ---
+function clearResultsTable() {
+  const body = document.getElementById("resultsBody");
+  if (body) body.innerHTML = "";
+}
+
+function escapeHtml(str) {
+  if (!str && str !== 0) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function appendResultRow(row) {
+  const body = document.getElementById("resultsBody");
+  if (!body) return;
+
+  const tr = document.createElement("tr");
+  const linksHtml = (row.matchedLinks || [])
+    .map(
+      (l) => `<a href="${escapeHtml(l)}" target="_blank">${escapeHtml(l)}</a>`
+    )
+    .join("<br>");
+
+  tr.innerHTML = `
+    <td>${escapeHtml(row.order)}</td>
+    <td>${escapeHtml(row.hotelNo)}</td>
+    <td>Child</td>
+    <td>${escapeHtml(row.hotelName)}</td>
+    <td>${escapeHtml(row.hotelAddress)}</td>
+    <td>${linksHtml}</td>
+  `;
+
+  body.appendChild(tr);
 }
 
 // Hàm kiểm tra tên khách sạn có nằm trong tiêu đề trang hay không
