@@ -196,6 +196,54 @@
                   >
                     <i class="fa-solid fa-play"></i><span>Resume</span>
                   </button>
+                  <div class="flex col" style="gap: 4px; min-width: 140px">
+                    <div style="display: flex; align-items: center; gap: 6px">
+                      <label
+                        style="
+                          font-size: 0.55rem;
+                          letter-spacing: 0.5px;
+                          text-transform: uppercase;
+                          color: var(--text-tertiary);
+                          display: flex;
+                          align-items: center;
+                          gap: 4px;
+                          margin: 0;
+                        "
+                      >
+                        <input
+                          type="checkbox"
+                          id="fuzzyEnable"
+                          style="margin: 0"
+                        />
+                        Fuzzy
+                      </label>
+                      <button
+                        type="button"
+                        id="fuzzyInfoBtn"
+                        class="btn btn-outline btn-small"
+                        style="padding: 2px 6px; font-size: 0.55rem"
+                        title="Giải thích Fuzzy"
+                      >
+                        <i class="fa-solid fa-circle-info"></i>
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      id="fuzzyThreshold"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value="0.78"
+                      title="Ngưỡng fuzzy (0-1)"
+                      style="
+                        font-size: 0.55rem;
+                        padding: 2px 4px;
+                        background: rgba(255, 255, 255, 0.1);
+                        border: 1px solid rgba(255, 255, 255, 0.15);
+                        border-radius: 6px;
+                      "
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -442,6 +490,7 @@
                       >▲</span
                     >
                   </th>
+                  <th>Fuzzy</th>
                   <th>
                     Status
                     <span id="statusSortIcon" class="sort-icon" title="Sắp xếp"
