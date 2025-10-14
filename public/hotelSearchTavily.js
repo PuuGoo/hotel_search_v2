@@ -16,12 +16,18 @@ document.addEventListener("DOMContentLoaded", function () {
   let currentPage = 1; // 1-based
   const counterEl = document.getElementById("counter");
   const resultsSection = document.getElementById("resultsSection");
-  function showResultsSection() {
-    if (resultsSection) resultsSection.style.display = "";
+  // === Visibility helpers (work with Tailwind-like .hidden utility) ===
+  function show(el, display) {
+    if (!el) return;
+    el.classList.remove("hidden");
+    if (display) el.style.display = display; else el.style.removeProperty("display");
   }
-  function hideResultsSection() {
-    if (resultsSection) resultsSection.style.display = "none";
+  function hide(el) {
+    if (!el) return;
+    if (!el.classList.contains("hidden")) el.classList.add("hidden");
   }
+  function showResultsSection() { show(resultsSection); }
+  function hideResultsSection() { hide(resultsSection); }
   // If there's no saved session, clear any stale runCount so page doesn't show e.g. 10/0
   try {
     const s = localStorage.getItem("tavily_session");
@@ -54,12 +60,18 @@ document.addEventListener("DOMContentLoaded", function () {
       const progressText = document.getElementById("progressText");
       // Disable button and show spinner
       if (searchBtn) searchBtn.disabled = true;
-      if (spinnerEl) spinnerEl.style.display = "flex";
+      // reveal spinner & pause button early
+  show(spinnerEl, "flex");
+  const pauseResumeBtn = document.getElementById("pauseResumeButton");
+  show(pauseResumeBtn, "inline-flex");
+  const progressContainerEl = document.getElementById("progressContainer");
+  show(progressContainerEl);
       const fileInput = document.getElementById("fileInput");
       if (!fileInput || fileInput.files.length === 0) {
         alert("Vui lòng chọn một file Excel!");
         if (searchBtn) searchBtn.disabled = false;
-        if (spinnerEl) spinnerEl.style.display = "none";
+        hide(spinnerEl);
+        hide(pauseResumeBtn);
         return;
       }
       const file = fileInput.files[0];
@@ -213,7 +225,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Ensure pause button is visible when a run starts
     const pauseBtnEl = document.getElementById("pauseResumeButton");
     if (pauseBtnEl) {
-      pauseBtnEl.style.display = "inline-block";
+      show(pauseBtnEl, "inline-flex");
       pauseBtnEl.textContent = "Tạm dừng";
     }
     let order = results.length ? results[results.length - 1].order + 1 : 1;
@@ -359,8 +371,7 @@ document.addEventListener("DOMContentLoaded", function () {
       currentIndex++;
       const pct = Math.round((currentIndex / MAX_RUNS) * 100);
       if (progressBar) progressBar.style.width = pct + "%";
-      if (progressText)
-        progressText.textContent = `${pct}% (${currentIndex}/${MAX_RUNS})`;
+      if (progressText) progressText.textContent = `${pct}% (${currentIndex}/${MAX_RUNS})`;
       console.log("Dong thu:", currentIndex, "hoan thanh.");
       isProcessingRow = false;
     }
@@ -375,7 +386,7 @@ document.addEventListener("DOMContentLoaded", function () {
       } catch (e) {}
       setupDownloadButton(results);
       if (clearBtn) {
-        clearBtn.style.display = "inline-block";
+        show(clearBtn, "inline-flex");
         clearBtn.onclick = () => {
           // show modal
           const modal = document.getElementById("confirmModal");
@@ -384,10 +395,10 @@ document.addEventListener("DOMContentLoaded", function () {
           const cancel = document.getElementById("confirmCancel");
           if (!modal || !input || !ok || !cancel) return;
           input.value = "";
-          modal.style.display = "flex";
+          show(modal, "flex");
           input.focus();
           const cleanup = () => {
-            modal.style.display = "none";
+            hide(modal);
             ok.onclick = null;
             cancel.onclick = null;
           };
@@ -399,8 +410,8 @@ document.addEventListener("DOMContentLoaded", function () {
               clearResultsTable();
               window.currentResults = [];
               hideResultsSection();
-              clearBtn.style.display = "none";
-              downloadBtn.style.display = "none";
+              hide(clearBtn);
+              hide(downloadBtn);
               try {
                 localStorage.removeItem("tavily_session");
                 localStorage.removeItem("runCount");
@@ -409,7 +420,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 const resumeBtn = document.getElementById(
                   "resumeSessionButton"
                 );
-                if (resumeBtn) resumeBtn.style.display = "none";
+                hide(resumeBtn);
               } catch (e) {}
               cleanup();
             } else {
@@ -426,9 +437,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     if (searchBtn) searchBtn.disabled = false;
-    if (spinnerEl) spinnerEl.style.display = "none";
-    if (pauseBtn) pauseBtn.style.display = "none";
-    if (progressContainer) progressContainer.style.display = "none";
+    hide(spinnerEl);
+    hide(pauseBtn);
+  hide(progressContainerEl);
   }
 
   // Pause/Resume handling
@@ -450,7 +461,7 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           // ensure download button is visible
           const downloadBtnEl = document.getElementById("downloadCSVButton");
-          if (downloadBtnEl) downloadBtnEl.style.display = "inline-block";
+          if (downloadBtnEl) show(downloadBtnEl, "inline-flex");
           // prepare filename containing timestamp and current count
           const now = new Date();
           const ts = now.toISOString().replace(/[:\.]/g, "-");
@@ -465,7 +476,7 @@ document.addEventListener("DOMContentLoaded", function () {
               const downloadBtnEl =
                 document.getElementById("downloadCSVButton");
               if (downloadBtnEl) {
-                downloadBtnEl.style.display = "inline-block";
+                show(downloadBtnEl, "inline-flex");
                 // bind a one-time click handler to download this snapshot with the filename
                 downloadBtnEl.onclick = () =>
                   downloadCSV(resultsToSave, filename);
@@ -511,9 +522,9 @@ document.addEventListener("DOMContentLoaded", function () {
       const spinnerEl = document.getElementById("spinner");
       const pauseBtn = document.getElementById("pauseResumeButton");
       if (searchBtn) searchBtn.disabled = true;
-      if (spinnerEl) spinnerEl.style.display = "flex";
+      show(spinnerEl, "flex");
       if (pauseBtn) {
-        pauseBtn.style.display = "inline-block";
+        show(pauseBtn, "inline-flex");
         pauseBtn.textContent = "Tạm dừng";
       }
 
@@ -735,7 +746,8 @@ function updateCounter(counterEl, runCount, MAX_RUNS) {
 // Thêm nút tải xuống CSV sau khi có dữ liệu
 function setupDownloadButton(results) {
   const downloadButton = document.getElementById("downloadCSVButton");
-  downloadButton.style.display = "block"; // Hiển thị nút
+  // ensure the button becomes visible (remove .hidden)
+  if (downloadButton) downloadButton.classList.remove("hidden");
   downloadButton.onclick = () => downloadCSV(results); // Khi nhấn mới tải
 }
 // Hàm xuất ra file CSV

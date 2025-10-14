@@ -1,569 +1,86 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hotel Search - Tavily</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tavily Hotel Search</title>
+    <meta name="description" content="Tìm kiếm khách sạn từ Excel với Tavily" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/app.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.2/xlsx.full.min.js"></script>
-
-    <style>
-      :root {
-        --brand1: #0ea5a1;
-        --brand2: #057a8a;
-        --muted: #6c7a7a;
-      }
-      body {
-        font-family: Inter, system-ui, Segoe UI, Roboto, Arial;
-        background: linear-gradient(135deg, #11cb90, #95b2e3);
-        margin: 0;
-        padding: 0;
-        color: #062b2e;
-      }
-      .container.app-wrapper {
-        padding: 28px 16px;
-        max-width: 1180px;
-      }
-      header {
-        max-width: 980px;
-        margin: 0 auto 18px;
-        text-align: center;
-      }
-      h1 {
-        font-size: 1.7rem;
-        color: #04313a;
-        margin: 6px 0;
-      }
-      .subtitle {
-        color: var(--muted);
-        font-size: 0.95rem;
-        margin-bottom: 14px;
-      }
-
-      .card-panel {
-        background: linear-gradient(180deg, #ffffff, #f6fdff);
-        border-radius: 12px;
-        padding: 16px;
-        box-shadow: 0 10px 30px rgba(5, 60, 70, 0.06);
-        border: 1px solid rgba(8, 40, 45, 0.04);
-        /* Ensure card panels have consistent width and centered */
-        max-width: 980px;
-        margin-left: auto;
-        margin-right: auto;
-      }
-      .form-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        align-items: center;
-      }
-      .file-col {
-        flex: 1;
-        min-width: 220px;
-      }
-      .meta-col {
-        width: 260px;
-        min-width: 200px;
-      }
-      label.form-label {
-        font-weight: 600;
-        color: #0b3f43;
-      }
-      input.form-control {
-        border-radius: 8px;
-      }
-
-      .actions {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-      }
-      .btn-custom {
-        border-radius: 10px;
-        padding: 10px 14px;
-        font-weight: 600;
-      }
-      .btn-primary-custom {
-        background: linear-gradient(90deg, var(--brand1), var(--brand2));
-        color: #fff;
-        border: none;
-      }
-      .btn-outline-custom {
-        background: #fff;
-        border: 1px solid rgba(6, 80, 85, 0.08);
-        color: #07575b;
-      }
-
-      .results-card {
-        width: 100%;
-        max-width: 100vw;
-        margin: 0 auto;
-        position: relative;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      .results-inner {
-        width: 100%;
-        max-width: 100vw;
-        margin: 24px auto;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      .table-responsive {
-        width: 100%;
-        max-width: 100vw;
-        border-radius: 12px;
-        overflow-x: auto;
-        border: 1px solid #e3f2fd;
-        box-shadow: 0 2px 12px rgba(8,40,45,0.07);
-        background: #f7fcff;
-        margin-bottom: 10px;
-      }
-      table#resultsTable {
-        width: 100%;
-        min-width: 900px;
-        table-layout: fixed;
-        border-collapse: separate;
-        background: #fff;
-        border-radius: 12px;
-        overflow: hidden;
-      }
-      table#resultsTable th, table#resultsTable td {
-        padding: 12px 10px;
-        font-size: 1rem;
-        border-bottom: 1px solid #e3f2fd;
-        vertical-align: middle;
-        white-space: nowrap;
-      }
-      table#resultsTable th {
-        background: linear-gradient(180deg, #f7fcff 80%, #eaf7fa 100%);
-        font-weight: 600;
-        color: #07575b;
-        border-top: 1px solid #e3f2fd;
-        position: relative;
-      }
-      table#resultsTable th span[title="Sắp xếp"] {
-        margin-left: 6px;
-        font-size: 1.15em;
-        color: #0ea5a1;
-        transition: color 0.2s;
-        vertical-align: middle;
-      }
-      table#resultsTable th span[title="Sắp xếp"]:hover {
-        color: #057a8a;
-      }
-      table#resultsTable td {
-        background: #fff;
-        transition: background 0.18s;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      table#resultsTable tbody tr:hover {
-        background: #e6f7ef !important;
-      }
-      table#resultsTable tbody tr.selected-row {
-        background: #d0f5e8 !important;
-        outline: 2px solid #0ea5a1;
-      }
-      .matched-cell {
-        max-width: 420px;
-        word-break: break-word;
-        background: #f6fdff;
-        border-radius: 8px;
-        padding: 8px 10px;
-      }
-      .matched-count-badge {
-        display: inline-block;
-        min-width: 32px;
-        padding: 4px 10px;
-        background: #e0f7fa;
-        color: #057a8a;
-        font-weight: 700;
-        border-radius: 999px;
-        font-size: 1rem;
-        text-align: center;
-      }
-      .status-matched {
-        background: #e6f7ef;
-        color: #0b7a53;
-        font-weight: 600;
-        border-radius: 8px;
-        padding: 6px 10px;
-        display: inline-block;
-      }
-      .status-nomatch {
-        background: #fff3f2;
-        color: #a33;
-        font-weight: 600;
-        border-radius: 8px;
-        padding: 6px 10px;
-        display: inline-block;
-      }
-      table#resultsTable th, table#resultsTable td {
-        border-right: 1px solid #e3f2fd;
-      }
-      table#resultsTable th:last-child, table#resultsTable td:last-child {
-        border-right: none;
-      }
-      table#resultsTable td .btn-outline-custom {
-        margin-right: 6px;
-        border-radius: 8px;
-        font-size: 0.97rem;
-        padding: 6px 12px;
-        box-shadow: 0 2px 8px rgba(8,40,45,0.07);
-        transition: background 0.18s, color 0.18s;
-      }
-      table#resultsTable td .btn-outline-custom:hover {
-        background: #e0f7fa;
-        color: #057a8a;
-      }
-      .detail-row {
-        transition: max-height 0.3s cubic-bezier(.4,0,.2,1), opacity 0.3s;
-        overflow: hidden;
-        opacity: 0;
-        max-height: 0;
-      }
-      .detail-row[aria-expanded="true"] {
-        opacity: 1;
-        max-height: 400px;
-        transition: max-height 0.4s cubic-bezier(.4,0,.2,1), opacity 0.3s;
-      }
-      .detail-row td {
-        background: #fbffff;
-        padding: 16px 32px;
-        border-left: 0;
-        border-right: 0;
-        font-size: 1rem;
-        word-break: break-word;
-        border-radius: 0 0 10px 10px;
-      }
-      /* Responsive tweaks */
-      @media (max-width: 1200px) {
-        .results-card, .results-inner, .table-responsive, table#resultsTable {
-          max-width: 100vw;
-          min-width: 520px;
-        }
-        table#resultsTable th, table#resultsTable td {
-          font-size: 0.95rem;
-          padding: 8px 4px;
-        }
-        .matched-cell { max-width: 180px; }
-      }
-      @media (max-width: 767px) {
-        .results-card, .results-inner, .table-responsive, table#resultsTable {
-          min-width: 320px;
-          font-size: 0.92rem;
-        }
-        .matched-cell { max-width: 120px; }
-        .table-responsive {
-          border-radius: 0;
-          box-shadow: none;
-        }
-      }
-      /* Filter and pagination controls */
-      #filterInput {
-        width: 220px;
-        max-width: 100%;
-        font-size: 1rem;
-        border-radius: 8px;
-        border: 1px solid #e3f2fd;
-        margin-left: 8px;
-      }
-      #resultsCount {
-        font-weight: 700;
-        color: #0ea5a1;
-      }
-      #pageSizeSelect {
-        min-width: 70px;
-        font-size: 0.95rem;
-        border-radius: 8px;
-        border: 1px solid #e3f2fd;
-      }
-      @media (max-width: 520px) {
-        #filterInput {
-          width: 120px;
-          font-size: 0.92rem;
-        }
-        #pageSizeSelect {
-          min-width: 50px;
-          font-size: 0.92rem;
-        }
-      }
-      /* Ensure margins adapt on smaller viewports */
-      @media (max-width: 900px) {
-        .results-card {
-          margin-left: 16px;
-          margin-right: 16px;
-        }
-      }
-      @media (max-width: 520px) {
-        .results-card {
-          margin-left: 12px;
-          margin-right: 12px;
-        }
-        table#resultsTable td{white-space:normal;}
-        table#resultsTable thead tr th:last-child,
-        table#resultsTable tbody tr td:last-child { min-width: 140px; width:140px }
-        .matched-cell { max-width: 220px; }
-      }
-      /* give the table header and footer rounded corners */
-      table#resultsTable thead tr th:first-child { border-top-left-radius: 10px }
-      table#resultsTable thead tr th:last-child { border-top-right-radius: 10px }
-      table#resultsTable tbody tr:last-child td:first-child { border-bottom-left-radius: 10px }
-      table#resultsTable tbody tr:last-child td:last-child { border-bottom-right-radius: 10px }
-      /* Ensure Actions column is wide enough to show multiple buttons */
-      table#resultsTable thead tr th:last-child,
-      table#resultsTable tbody tr td:last-child {
-        min-width: 180px;
-        width: 180px;
-        white-space: nowrap;
-      }
-      table.table tbody tr:hover {
-        background: #f2fbff;
-      }
-      .matched-cell {
-        max-width: 420px;
-        word-break: break-word;
-      }
-      .link-chip {
-        display: inline-block;
-        margin: 4px 6px 0 0;
-        padding: 6px 8px;
-        background: #eef9fa;
-        color: #036;
-        border-radius: 999px;
-        font-size: 0.82rem;
-        text-decoration: none;
-      }
-
-      @media (max-width: 767px) {
-        .form-row {
-          flex-direction: column;
-        }
-        .meta-col {
-          width: 100%;
-        }
-      }
-      /* selected row highlight for keyboard shortcuts */
-      tr.selected-row { outline: 3px solid rgba(6,122,138,0.12); background:#eefaf9; }
-      .detail-row td {
-        background: #fbffff;
-        padding: 10px 32px; /* tăng padding trái/phải cho dòng mở rộng */
-        border-left: 0;
-        border-right: 0;
-        font-size: 1rem;
-        word-break: break-word;
-      }
-      .detail-row {
-        box-shadow: 0 2px 12px rgba(8,40,45,0.07);
-      }
-    </style>
-    <style>
-      /* Simple modal styles */
-      .modal-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.45);
-        display: none;
-        align-items: center;
-        justify-content: center;
-        z-index: 2000;
-      }
-      .modal-card {
-        background: #fff;
-        border-radius: 12px;
-        padding: 18px;
-        width: 420px;
-        box-shadow: 0 12px 40px rgba(2,10,20,0.2);
-        font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto;
-      }
-      .modal-card h4 { margin:0 0 8px; }
-      .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:14px }
-      .modal-input { width:100%; padding:8px 10px; border-radius:8px; border:1px solid #e6eef0 }
-    </style>
-    <style>
-      /* Styles for generated page buttons in .button-container */
-      .button-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        justify-content: center;
-        margin-top: 14px;
-      }
-      .button-container a {
-        text-decoration: none;
-      }
-      .button-container button {
-        background: linear-gradient(90deg, var(--brand1), var(--brand2));
-        color: #fff;
-        border: none;
-        padding: 10px 14px;
-        border-radius: 10px;
-        font-weight: 600;
-        cursor: pointer;
-        box-shadow: 0 6px 18px rgba(5, 122, 138, 0.12);
-      }
-      .button-container button:hover {
-        transform: translateY(-2px);
-      }
-    </style>
   </head>
   <body>
-    <div class="container app-wrapper">
-      <header>
-        <h1>TÌM KIẾM KHÁCH SẠN - Child</h1>
-        <div class="subtitle">
-          Import file Excel (No, Child's Name, Child's Address). Kết quả sẽ
-          hiển thị trực tiếp phía dưới.
+    <a href="#pageSEARCHTAVILY" class="skip-link">Bỏ qua tới nội dung</a>
+    <header class="app-header no-print">
+      <div class="app-header-inner">
+        <div class="brand"><span class="logo"><i class="fa-solid fa-hotel"></i></span> <span>Tavily Search</span></div>
+        <div class="flex gap-sm center" style="margin-left:auto">
+          <div class="clock" aria-label="Đồng hồ">--:--:--</div>
+          <button id="themeToggle" type="button" class="btn btn-outline btn-pill" title="Đổi giao diện (Alt+D)"><i class="fa-solid fa-circle-half-stroke"></i></button>
+          <a href="/logout" class="btn btn-outline btn-small"><i class="fa-solid fa-right-from-bracket"></i><span>Đăng xuất</span></a>
         </div>
-      </header>
-
-      <section id="pageSEARCHTAVILY" class="card-panel">
-        <div class="d-flex justify-content-between align-items-start mb-2">
-          <div>
-            <h4 style="margin: 0; color: #083344">Nhập dữ liệu</h4>
-            <div style="color: var(--muted); font-size: 0.9rem">
-              Chọn file Excel và bấm bắt đầu để chạy tìm kiếm.
+      </div>
+    </header>
+    <main class="container stack-lg" style="padding-top:var(--spacing-lg);padding-bottom:var(--spacing-xl)">
+      <h1 class="gradient-text" style="margin:0;font-size:1.8rem">Tìm kiếm khách sạn - Child</h1>
+      <p class="text-secondary" style="margin:0 0 var(--spacing-md); max-width:720px">Upload file Excel (các cột: No, Child's Name, Child's Address). Quá trình tìm kiếm chạy live và kết quả hiển thị ngay lập tức.</p>
+      <div class="tabs" data-tabs role="tablist" aria-label="Điều hướng">
+        <button role="tab" aria-selected="true" data-target="panel-upload"><i class="fa-solid fa-file-import"></i> <span>Upload</span></button>
+        <button role="tab" aria-selected="false" data-target="panel-results"><i class="fa-solid fa-table"></i> <span>Kết quả</span></button>
+      </div>
+      <section id="panel-upload" class="tab-panel active" role="tabpanel" tabindex="0">
+        <div id="pageSEARCHTAVILY" class="glass-card gradient" role="region" aria-labelledby="sectionInputTitle">
+          <div class="card-header"><i class="fa-solid fa-database"></i> Nhập dữ liệu</div>
+          <div class="form-row">
+            <div class="form-col">
+              <label for="fileInput">File Excel</label>
+              <input id="fileInput" type="file" accept=".xlsx,.xls" />
+              <div class="text-tertiary" style="font-size:.65rem;margin-top:6px">Hỗ trợ .xlsx / .xls</div>
             </div>
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="file-col">
-            <label for="fileInput" class="form-label">File Excel</label>
-            <input
-              id="fileInput"
-              class="form-control"
-              type="file"
-              accept=".xlsx,.xls"
-            />
-          </div>
-
-          <div class="meta-col">
-            <label class="form-label">Trạng thái</label>
-            <div style="display: flex; flex-direction: column; gap: 8px">
-              <div id="counter">0 lượt tìm kiếm đã chạy</div>
-              <div style="display: flex; gap: 8px">
-                <button
-                  id="downloadCSVButton"
-                  class="btn btn-outline-primary btn-custom"
-                  style="display: none"
-                >
-                  Tải CSV
-                </button>
-                <button
-                  id="clearResultsButton"
-                  class="btn btn-outline-secondary btn-custom"
-                  style="display: none"
-                >
-                  Xóa kết quả
-                </button>
-                  <button
-                    id="resumeSessionButton"
-                    class="btn btn-outline-success btn-custom"
-                    style="display: none; margin-left:6px"
-                  >
-                    Resume phiên
-                  </button>
+            <div class="form-col" style="max-width:280px">
+              <label>Trạng thái</label>
+              <div class="stack-sm" style="font-size:.75rem">
+                <div id="counter" class="badge" style="background:rgba(255,255,255,0.12)">0/0 lượt tìm kiếm</div>
+                <div class="flex gap-xs wrap">
+                  <button id="downloadCSVButton" class="btn btn-outline btn-small hidden"><i class="fa-solid fa-download"></i><span>CSV</span></button>
+                  <button id="clearResultsButton" class="btn btn-outline btn-small hidden"><i class="fa-solid fa-trash-can"></i><span>Xóa</span></button>
+                  <button id="resumeSessionButton" class="btn btn-outline btn-small hidden"><i class="fa-solid fa-play"></i><span>Resume</span></button>
+                </div>
               </div>
             </div>
           </div>
-
-          <div style="flex-basis: 100%; height: 0"></div>
-
-          <div
-            style="
-              width: 100%;
-              display: flex;
-              gap: 12px;
-              align-items: center;
-              margin-top: 6px;
-            "
-          >
-            <button
-              id="searchButton"
-              type="button"
-              class="btn btn-primary-custom btn-custom"
-              style="flex: 1"
-            >
-              Bắt đầu tìm kiếm
-            </button>
-            <div id="spinner" style="display: none; align-items: center">
-              <div
-                class="spinner-border text-primary"
-                role="status"
-                aria-hidden="true"
-              ></div>
-              <span style="margin-left: 8px; color: #083344"
-                >Đang xử lý...</span
-              >
+          <div class="stack-sm" style="margin-top:var(--spacing-md)">
+            <div class="flex gap-sm wrap">
+              <button id="searchButton" type="button" class="btn btn-primary btn-modern" style="flex:1"><i class="fa-solid fa-magnifying-glass"></i><span>Bắt đầu tìm kiếm</span></button>
+              <button id="pauseResumeButton" class="btn btn-outline hidden" style="min-width:140px"><i class="fa-solid fa-pause"></i><span>Tạm dừng</span></button>
+              <div id="spinner" class="flex gap-xs hidden center" style="min-width:140px">
+                <div class="loading-inline"></div>
+                <span class="text-tertiary" style="font-size:.65rem;letter-spacing:.5px;">Đang xử lý...</span>
+              </div>
             </div>
-            <button id="pauseResumeButton" class="btn btn-outline-custom btn-custom" style="display:none; margin-left:8px">Tạm dừng</button>
-          </div>
-          <div style="width:100%; margin-top:10px; display:none" id="progressContainer">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-              <div style="font-size:0.95rem;color:#083344">Tiến độ</div>
-              <div id="progressText" style="font-size:0.9rem;color:var(--muted)">0%</div>
+            <div id="progressContainer" class="hidden" style="margin-top:4px">
+              <label for="progressBar" class="visually-hidden">Tiến độ</label>
+              <div class="progress" aria-hidden="true"><div id="progressBar" class="progress-bar"></div></div>
+              <div id="progressText" class="text-tertiary" style="font-size:.6rem;letter-spacing:.45px;margin-top:4px;text-transform:uppercase">0%</div>
             </div>
-            <div style="background:#e9f7f6;border-radius:10px;height:12px;overflow:hidden">
-              <div id="progressBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--brand1),var(--brand2));transition:width 300ms ease"></div>
-            </div>
-          </div>
           </div>
         </div>
-
-  <!-- Live results -->
-  <div id="resultsSection" class="results-card" style="display:none">
-          <div class="card-panel results-card">
-        <div class="results-inner">
-            <div style="display:flex;justify-content:center;align-items:center;margin-bottom:10px;">
-              <div style="flex:1;text-align:center;">
-                <h3 style="margin:0">Kết quả (Live)</h3>
-                <div style="font-size:0.9rem;color:var(--muted)">Dòng kết quả sẽ xuất hiện khi xử lý</div>
-              </div>
-            </div>
-            <div style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:10px;">
-              <div style="display:flex;gap:12px;align-items:center;">
-                <label for="filterInput" style="margin:0;font-size:0.95rem;color:#083344">Lọc</label>
-                <input id="filterInput" type="search" placeholder="Tìm theo tên khách sạn" class="form-control" style="width:260px;padding:6px;border-radius:8px" />
-                <div style="font-size:0.9rem;color:var(--muted)">Tổng: <span id="resultsCount">0</span></div>
-              </div>
-            </div>
-
-            <div class="table-responsive">
-              <table id="resultsTable" class="table table-striped table-bordered">
-                <thead>
-                  <tr>
-                    <th style="width:110px;white-space:nowrap">Order <span id="orderSortIcon" style="cursor:pointer;margin-left:6px;font-size:1.15em;vertical-align:middle" title="Sắp xếp">▲</span></th>
-                    <th style="width:110px;white-space:nowrap">No <span id="noSortIcon" style="cursor:pointer;margin-left:6px;font-size:1.15em;vertical-align:middle" title="Sắp xếp">▲</span></th>
-                    <th style="width:90px;white-space:nowrap">% <span id="pctSortIcon" style="cursor:pointer;margin-left:6px;font-size:1.15em;vertical-align:middle" title="Sắp xếp">▲</span></th>
-                    <th style="width:110px;white-space:nowrap">Status <span id="statusSortIcon" style="cursor:pointer;margin-left:6px;font-size:1.15em;vertical-align:middle" title="Sắp xếp">▲</span></th>
-                    <th>Hotel Name <span id="nameSortIcon" style="cursor:pointer;margin-left:6px;font-size:1.15em;vertical-align:middle" title="Sắp xếp">▲</span></th>
-                    <th>Hotel Address</th>
-                    <th>Matched Links</th>
-                    <th style="width:135px;white-space:nowrap">Total Link <span id="linksSortIcon" style="cursor:pointer;margin-left:6px;font-size:1.15em;vertical-align:middle" title="Sắp xếp">▲</span></th>
-                    <th style="width:180px">Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="resultsBody"></tbody>
-              </table>
-            </div>
-            <!-- pagination controls (moved here, right-aligned) -->
-            <div style="display:flex;justify-content:flex-end;align-items:center;margin-top:8px;gap:8px">
-              <button id="pagePrev" class="btn btn-outline-custom btn-sm">« Prev</button>
-              <div id="pageInfo" style="min-width:110px;text-align:center">Trang 1/1</div>
-              <button id="pageNext" class="btn btn-outline-custom btn-sm">Next »</button>
-              <label style="margin:0 6px 0 12px;color:var(--muted)">Hiển thị</label>
-              <select id="pageSizeSelect" class="form-control" style="width:90px;padding:6px;border-radius:8px">
-                <option value="25" >25</option>
+      </section>
+      <section id="panel-results" class="tab-panel" role="tabpanel" tabindex="0" aria-busy="false">
+        <div id="resultsSection" class="glass-card hidden" aria-live="polite" aria-labelledby="resultsTitle">
+          <div class="card-header"><i class="fa-solid fa-table"></i> Kết quả (Live)</div>
+          <div class="flex wrap gap-sm" style="align-items:center; margin-bottom:var(--spacing-sm)">
+            <label for="filterInput" class="text-tertiary" style="margin:0">Lọc</label>
+            <input id="filterInput" type="search" placeholder="Tìm tên khách sạn" style="max-width:260px" />
+            <div class="badge" style="background:rgba(255,255,255,0.1)">Tổng: <span id="resultsCount" style="margin-left:4px">0</span></div>
+            <div class="flex gap-xs" style="margin-left:auto; align-items:center">
+              <label for="pageSizeSelect" class="text-tertiary" style="font-size:.6rem;letter-spacing:.5px;text-transform:uppercase">Page size</label>
+              <select id="pageSizeSelect" style="width:90px">
+                <option value="25">25</option>
                 <option value="50">50</option>
                 <option value="100">100</option>
                 <option value="200">200</option>
@@ -572,27 +89,53 @@
                 <option value="2000">2000</option>
               </select>
             </div>
-            </div>
+          </div>
+          <div class="table-wrapper" style="max-height:64vh;overflow:auto">
+            <table id="resultsTable" aria-describedby="resultsTitle">
+              <thead>
+                <tr>
+                  <th>Order <span id="orderSortIcon" class="sort-icon" title="Sắp xếp">▲</span></th>
+                  <th>No <span id="noSortIcon" class="sort-icon" title="Sắp xếp">▲</span></th>
+                  <th>% <span id="pctSortIcon" class="sort-icon" title="Sắp xếp">▲</span></th>
+                  <th>Status <span id="statusSortIcon" class="sort-icon" title="Sắp xếp">▲</span></th>
+                  <th>Hotel Name <span id="nameSortIcon" class="sort-icon" title="Sắp xếp">▲</span></th>
+                  <th>Hotel Address</th>
+                  <th>Matched Links</th>
+                  <th>Total Link <span id="linksSortIcon" class="sort-icon" title="Sắp xếp">▲</span></th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="resultsBody"></tbody>
+            </table>
+          </div>
+          <div class="flex gap-sm wrap" style="justify-content:flex-end;align-items:center;margin-top:var(--spacing-sm)">
+            <button id="pagePrev" class="btn btn-outline btn-small">« Prev</button>
+            <div id="pageInfo" class="badge" style="background:rgba(255,255,255,0.08)">Trang 1/1</div>
+            <button id="pageNext" class="btn btn-outline btn-small">Next »</button>
           </div>
         </div>
       </section>
-
-      <div class="button-container"></div>
-    </div>
-
-    <script src="./libs/xlsx.full.min.js"></script>
-    <script type="module" src="hotelSearchTavily.js"></script>
-    <!-- Confirm delete modal -->
-    <div id="confirmModal" class="modal-overlay">
-      <div class="modal-card">
-        <h4>Xác nhận xóa kết quả</h4>
-        <div style="color:#556;">Để xóa tất cả kết quả và session, vui lòng nhập <strong>Đồng Ý Xóa</strong> vào ô bên dưới và nhấn Xác nhận.</div>
-        <input id="confirmInput" class="modal-input" placeholder="Gõ: Đồng Ý Xóa" />
-        <div class="modal-actions">
-          <button id="confirmCancel" class="btn btn-outline-secondary">Hủy</button>
-          <button id="confirmOk" class="btn btn-danger">Xác nhận</button>
-        </div>
-      </div>
-    </div>
+    </main>
+    <div class="toast-container" aria-live="polite" aria-atomic="true"></div>
+    <footer class="app-footer text-tertiary">© <span id="year"></span> Tavily Search Module.</footer>
+    <script type="module" src="/ui.js"></script>
+    <script type="module" src="/hotelSearchTavily.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded',()=>{
+        document.getElementById('year').textContent = new Date().getFullYear();
+        const stored=localStorage.getItem('theme'); if(stored) document.documentElement.setAttribute('data-theme',stored);
+        const themeBtn=document.getElementById('themeToggle');
+        themeBtn.addEventListener('click',()=>{ const cur=document.documentElement.getAttribute('data-theme'); const next=cur==='dark'?'light':'dark'; document.documentElement.setAttribute('data-theme',next); localStorage.setItem('theme',next); });
+        const resultsSection=document.getElementById('resultsSection');
+        const tabButtons=[...document.querySelectorAll('[role="tab"]')];
+        const resultsTab=tabButtons.find(b=> b.dataset.target==='panel-results');
+        const observer=new MutationObserver(()=>{
+          if(resultsSection && !resultsSection.classList.contains('hidden')){
+            if(resultsTab){ resultsTab.click(); observer.disconnect(); }
+          }
+        });
+        observer.observe(resultsSection,{ attributes:true, attributeFilter:['class']});
+      });
+    </script>
   </body>
 </html>
