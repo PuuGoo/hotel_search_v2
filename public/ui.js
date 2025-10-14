@@ -122,7 +122,17 @@ const Toasts = (() => {
     }
     return el;
   }
-  return { show };
+  function success(msg, opts = {}) {
+    return show(msg, {
+      type: "success",
+      title: opts.title || "Thành công",
+      ...opts,
+    });
+  }
+  function error(msg, opts = {}) {
+    return show(msg, { type: "error", title: opts.title || "Lỗi", ...opts });
+  }
+  return { show, success, error };
 })();
 
 // MODAL MANAGER -----------------------------------------------------------

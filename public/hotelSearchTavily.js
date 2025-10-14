@@ -1,4 +1,5 @@
 import axios from "https://cdn.jsdelivr.net/npm/axios@1.6.8/dist/esm/axios.min.js";
+import { Toasts } from "/ui.js";
 
 // Đảm bảo rằng script chỉ chạy khi DOM đã tải xong
 document.addEventListener("DOMContentLoaded", function () {
@@ -8,6 +9,8 @@ document.addEventListener("DOMContentLoaded", function () {
   let isPaused = false;
   let isProcessingRow = false;
   let shouldStop = false;
+  let stoppedPermanently =
+    localStorage.getItem("tavily_stopped_permanently") === "1";
   let runCount = parseInt(localStorage.getItem("runCount") || "0");
   // Pagination settings
   const PAGE_SIZES = [50, 100, 200, 500, 1000, 2000];
@@ -52,14 +55,28 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   } catch (e) {}
 
-  document
-    .getElementById("searchButton")
-    .addEventListener("click", async () => {
+  const searchBtnEl = document.getElementById("searchButton");
+  if (searchBtnEl)
+    searchBtnEl.addEventListener("click", async () => {
+      // If previous run was permanently stopped, reset flags for a clean new run
+      if (stoppedPermanently) {
+        stoppedPermanently = false;
+        shouldStop = false;
+        localStorage.removeItem("tavily_stopped_permanently");
+        // Clear any old session data so we don't auto-resume
+        localStorage.removeItem("tavily_session");
+        localStorage.removeItem("runCount");
+        runCount = 0;
+        updateCounter(counterEl, 0, 0);
+      }
+      // Always clear shouldStop at the beginning of a brand new run
+      shouldStop = false;
       const searchBtn = document.getElementById("searchButton");
       const spinnerEl = document.getElementById("spinner");
       const downloadBtn = document.getElementById("downloadCSVButton");
       const clearBtn = document.getElementById("clearResultsButton");
       const pauseBtn = document.getElementById("pauseResumeButton");
+      const stopBtn = document.getElementById("stopButton");
       const progressContainer = document.getElementById("progressContainer");
       const progressBar = document.getElementById("progressBar");
       const progressText = document.getElementById("progressText");
@@ -69,14 +86,23 @@ document.addEventListener("DOMContentLoaded", function () {
       show(spinnerEl, "flex");
       const pauseResumeBtn = document.getElementById("pauseResumeButton");
       show(pauseResumeBtn, "inline-flex");
+      if (stopBtn) show(stopBtn, "inline-flex");
       const progressContainerEl = document.getElementById("progressContainer");
       show(progressContainerEl);
       const fileInput = document.getElementById("fileInput");
       if (!fileInput || fileInput.files.length === 0) {
-        alert("Vui lòng chọn một file Excel!");
+        if (Toasts && Toasts.error)
+          Toasts.error("Vui lòng chọn một file Excel!");
+        else if (Toasts)
+          Toasts.show("Vui lòng chọn một file Excel!", {
+            type: "error",
+            title: "Lỗi",
+          });
+        else alert("Vui lòng chọn một file Excel!");
         if (searchBtn) searchBtn.disabled = false;
         hide(spinnerEl);
         hide(pauseResumeBtn);
+        hide(stopBtn);
         return;
       }
       const file = fileInput.files[0];
@@ -219,9 +245,11 @@ document.addEventListener("DOMContentLoaded", function () {
     const downloadBtn = document.getElementById("downloadCSVButton");
     const clearBtn = document.getElementById("clearResultsButton");
     const pauseBtn = document.getElementById("pauseResumeButton");
+    const stopBtn = document.getElementById("stopButton");
     const progressContainer = document.getElementById("progressContainer");
     const progressBar = document.getElementById("progressBar");
     const progressText = document.getElementById("progressText");
+    const resumeBadge = document.getElementById("resumeBadge");
 
     const results =
       window.currentResults && window.currentResults.length
@@ -240,6 +268,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // If starting fresh, clear table
     if (startIndex === 0) clearResultsTable();
 
+    const startTime = Date.now();
     for (let rowIndex = startIndex; rowIndex < jsonData.length; rowIndex++) {
       while (isPaused) {
         await new Promise((r) => setTimeout(r, 200));
@@ -376,8 +405,29 @@ document.addEventListener("DOMContentLoaded", function () {
       currentIndex++;
       const pct = Math.round((currentIndex / MAX_RUNS) * 100);
       if (progressBar) progressBar.style.width = pct + "%";
-      if (progressText)
-        progressText.textContent = `${pct}% (${currentIndex}/${MAX_RUNS})`;
+      if (progressText) {
+        const elapsed = Date.now() - startTime; // ms
+        const avg = currentIndex ? elapsed / currentIndex : 0;
+        const remaining = MAX_RUNS - currentIndex;
+        const etaMs = Math.round(remaining * avg);
+        const fmt = (ms) => {
+          if (!isFinite(ms) || ms <= 0) return "0s";
+          const s = Math.round(ms / 1000);
+          const m = Math.floor(s / 60);
+          const rs = s % 60;
+          return m ? `${m}m${rs ? rs + "s" : ""}` : `${rs}s`;
+        };
+        progressText.textContent = `${pct}% (${currentIndex}/${MAX_RUNS}) • ETA ${fmt(
+          etaMs
+        )}`;
+      }
+      if (progressBar) {
+        progressBar.setAttribute("aria-valuenow", String(pct));
+        progressBar.setAttribute(
+          "aria-valuetext",
+          `${pct} phần trăm (${currentIndex}/${MAX_RUNS})`
+        );
+      }
       console.log("Dong thu:", currentIndex, "hoan thanh.");
       isProcessingRow = false;
     }
@@ -413,6 +463,12 @@ document.addEventListener("DOMContentLoaded", function () {
           };
           ok.onclick = () => {
             if (input.value === "Đồng Ý Xóa") {
+              // Snapshot for undo
+              window.__lastClearedSnapshot = {
+                results: (window.currentResults || []).slice(),
+                runCountSnapshot: runCount,
+                maxRunsSnapshot: MAX_RUNS,
+              };
               clearResultsTable();
               window.currentResults = [];
               hideResultsSection();
@@ -429,23 +485,181 @@ document.addEventListener("DOMContentLoaded", function () {
                 hide(resumeBtn);
               } catch (e) {}
               cleanup();
+              if (Toasts) {
+                Toasts.show("Đã xóa kết quả", {
+                  type: "success",
+                  title: "Xóa",
+                  actions: [
+                    {
+                      label: "Hoàn tác",
+                      onClick: () => {
+                        const snap = window.__lastClearedSnapshot;
+                        if (!snap) return;
+                        window.currentResults = snap.results.slice();
+                        runCount = snap.runCountSnapshot;
+                        MAX_RUNS = snap.maxRunsSnapshot;
+                        updateCounter(counterEl, runCount, MAX_RUNS);
+                        showResultsSection();
+                        clearResultsTable();
+                        window.currentResults.forEach((r) =>
+                          appendResultRow(r)
+                        );
+                        const undoInline = document.getElementById(
+                          "undoInlineContainer"
+                        );
+                        if (undoInline) {
+                          undoInline.innerHTML = "";
+                          hide(undoInline);
+                        }
+                      },
+                    },
+                  ],
+                  timeout: 6000,
+                });
+              }
+              // Inline undo button
+              try {
+                const undoInline = document.getElementById(
+                  "undoInlineContainer"
+                );
+                if (undoInline) {
+                  undoInline.innerHTML = "";
+                  const btn = document.createElement("button");
+                  btn.className = "btn btn-outline btn-small";
+                  btn.innerHTML =
+                    '<i class="fa-solid fa-rotate-left"></i><span>Hoàn tác xóa</span>';
+                  btn.addEventListener("click", () => {
+                    const snap = window.__lastClearedSnapshot;
+                    if (!snap) return;
+                    window.currentResults = snap.results.slice();
+                    runCount = snap.runCountSnapshot;
+                    MAX_RUNS = snap.maxRunsSnapshot;
+                    updateCounter(counterEl, runCount, MAX_RUNS);
+                    showResultsSection();
+                    clearResultsTable();
+                    window.currentResults.forEach((r) => appendResultRow(r));
+                    undoInline.innerHTML = "";
+                    hide(undoInline);
+                  });
+                  undoInline.appendChild(btn);
+                  show(undoInline, "block");
+                  setTimeout(() => {
+                    if (undoInline && undoInline.firstChild) {
+                      undoInline.innerHTML = "";
+                      hide(undoInline);
+                    }
+                  }, 15000);
+                }
+              } catch (e) {}
             } else {
-              alert(
-                'Xóa đã bị hủy. Bạn phải gõ đúng "Đồng Ý Xóa" để xác nhận.'
-              );
+              if (Toasts)
+                Toasts.show("Bạn phải nhập đúng: Đồng Ý Xóa", {
+                  type: "error",
+                  title: "Chưa xác nhận",
+                });
               input.focus();
             }
           };
         };
       }
     } else {
-      alert("Không tìm thấy kết quả nào khớp với tên khách sạn.");
+      if (Toasts)
+        Toasts.show("Không tìm thấy kết quả nào phù hợp", {
+          type: "error",
+          title: "Không có kết quả",
+        });
     }
 
     if (searchBtn) searchBtn.disabled = false;
     hide(spinnerEl);
     hide(pauseBtn);
     hide(progressContainer);
+    if (stopBtn) hide(stopBtn);
+    if (resumeBadge) hide(resumeBadge);
+    if (shouldStop) {
+      // mark permanent stop so auto-resume after F5 will not run
+      // snapshot current results for possible restore (not auto-run)
+      try {
+        const snap = {
+          results: (window.currentResults || []).slice(),
+          runCount: runCount,
+          maxRuns: MAX_RUNS,
+          stoppedAt: Date.now(),
+        };
+        localStorage.setItem("tavily_stop_snapshot", JSON.stringify(snap));
+      } catch (e) {
+        /* ignore */
+      }
+      localStorage.setItem("tavily_stopped_permanently", "1");
+      stoppedPermanently = true;
+      try {
+        localStorage.removeItem("tavily_session");
+      } catch (e) {}
+      if (Toasts) {
+        Toasts.show("Đã dừng. Bạn có thể Hoàn tác để xem lại kết quả.", {
+          type: "warning",
+          title: "Dừng",
+          actions: [
+            {
+              label: "Hoàn tác",
+              onClick: () => {
+                try {
+                  const raw = localStorage.getItem("tavily_stop_snapshot");
+                  if (!raw) return;
+                  const snap = JSON.parse(raw);
+                  window.currentResults = snap.results || [];
+                  runCount =
+                    snap.runCount || (window.currentResults || []).length;
+                  MAX_RUNS = snap.maxRuns || runCount;
+                  updateCounter(counterEl, runCount, MAX_RUNS);
+                  showResultsSection();
+                  clearResultsTable();
+                  (window.currentResults || []).forEach((r) =>
+                    appendResultRow(r)
+                  );
+                } catch (e) {}
+              },
+            },
+          ],
+          timeout: 8000,
+        });
+      }
+      // inline undo button below if container exists
+      try {
+        const undoInline = document.getElementById("undoInlineContainer");
+        if (undoInline) {
+          undoInline.innerHTML = "";
+          const btn = document.createElement("button");
+          btn.className = "btn btn-outline btn-small";
+          btn.innerHTML =
+            '<i class="fa-solid fa-rotate-left"></i><span>Hoàn tác dừng</span>';
+          btn.addEventListener("click", () => {
+            try {
+              const raw = localStorage.getItem("tavily_stop_snapshot");
+              if (!raw) return;
+              const snap = JSON.parse(raw);
+              window.currentResults = snap.results || [];
+              runCount = snap.runCount || (window.currentResults || []).length;
+              MAX_RUNS = snap.maxRuns || runCount;
+              updateCounter(counterEl, runCount, MAX_RUNS);
+              showResultsSection();
+              clearResultsTable();
+              (window.currentResults || []).forEach((r) => appendResultRow(r));
+              undoInline.innerHTML = "";
+              hide(undoInline);
+            } catch (e) {}
+          });
+          undoInline.appendChild(btn);
+          show(undoInline, "block");
+          setTimeout(() => {
+            if (undoInline && undoInline.firstChild) {
+              undoInline.innerHTML = "";
+              hide(undoInline);
+            }
+          }, 20000);
+        }
+      } catch (e) {}
+    }
   }
 
   // Pause/Resume handling
@@ -502,10 +716,26 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
   }
+  const stopBtnGlobal = document.getElementById("stopButton");
+  if (stopBtnGlobal) {
+    stopBtnGlobal.addEventListener("click", () => {
+      if (shouldStop) return;
+      shouldStop = true;
+      stopBtnGlobal.disabled = true;
+      stopBtnGlobal.innerHTML =
+        '<i class="fa-solid fa-circle-stop"></i><span>Đang dừng...</span>';
+      if (Toasts)
+        Toasts.show("Đang chờ dòng hiện tại hoàn tất...", {
+          type: "info",
+          title: "Dừng",
+        });
+    });
+  }
   // Auto-resume if a saved session with allRows exists
   try {
     const saved = JSON.parse(localStorage.getItem("tavily_session") || "null");
     if (
+      !stoppedPermanently &&
       saved &&
       Array.isArray(saved.allRows) &&
       typeof saved.nextIndex === "number" &&
@@ -544,10 +774,17 @@ document.addEventListener("DOMContentLoaded", function () {
         const done = runCount; // runCount reflects saved.results length
         const pct = Math.min(100, Math.round((done / MAX_RUNS) * 100));
         progressBarResume.style.width = pct + "%";
+        progressBarResume.setAttribute("aria-valuenow", String(pct));
+        progressBarResume.setAttribute(
+          "aria-valuetext",
+          `${pct} phần trăm (${done}/${MAX_RUNS})`
+        );
         if (progressTextResume) {
           progressTextResume.textContent = `${pct}% (${done}/${MAX_RUNS})`;
         }
       }
+      const resumeBadge = document.getElementById("resumeBadge");
+      if (resumeBadge) show(resumeBadge, "inline-flex");
 
       // start processing automatically from saved.nextIndex
       (async () => {
@@ -556,6 +793,8 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (e) {
           console.error("Auto-resume failed", e);
         }
+        const resumeBadge = document.getElementById("resumeBadge");
+        if (resumeBadge) hide(resumeBadge);
       })();
     }
   } catch (e) {

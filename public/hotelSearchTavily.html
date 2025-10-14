@@ -211,6 +211,15 @@
               >
                 <i class="fa-solid fa-pause"></i><span>Tạm dừng</span>
               </button>
+              <button
+                id="stopButton"
+                class="btn btn-outline hidden"
+                style="min-width: 120px; --btn-accent: #ff4d4f"
+                aria-label="Dừng toàn bộ"
+                title="Dừng toàn bộ (Stop)"
+              >
+                <i class="fa-solid fa-stop"></i><span>Dừng</span>
+              </button>
               <div
                 id="spinner"
                 class="flex gap-xs hidden center"
@@ -226,8 +235,17 @@
             </div>
             <div id="progressContainer" class="hidden" style="margin-top: 4px">
               <label for="progressBar" class="visually-hidden">Tiến độ</label>
-              <div class="progress" aria-hidden="true">
-                <div id="progressBar" class="progress-bar"></div>
+              <div class="progress">
+                <div
+                  id="progressBar"
+                  class="progress-bar"
+                  role="progressbar"
+                  aria-label="Tiến độ xử lý"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  aria-valuenow="0"
+                  aria-valuetext="0 phần trăm (0/0)"
+                ></div>
               </div>
               <div
                 id="progressText"
@@ -242,6 +260,21 @@
                 0%
               </div>
             </div>
+            <div
+              id="resumeBadge"
+              class="badge hidden"
+              style="
+                background: linear-gradient(90deg, #3ba55d, #2d7d44);
+                margin-top: 4px;
+              "
+            >
+              ĐANG TIẾP TỤC (RESUME)
+            </div>
+            <div
+              id="undoInlineContainer"
+              class="hidden"
+              style="margin-top: 6px"
+            ></div>
           </div>
         </div>
       </section>
