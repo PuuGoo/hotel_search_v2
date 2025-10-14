@@ -85,13 +85,79 @@
           </div>
           <div class="form-row">
             <div class="form-col">
-              <label for="fileInput">File Excel</label>
-              <input id="fileInput" type="file" accept=".xlsx,.xls" />
+              <label for="fileInput">Tệp Excel</label>
               <div
-                class="text-tertiary"
-                style="font-size: 0.65rem; margin-top: 6px"
+                id="fileDropZone"
+                class="drop-zone"
+                style="padding: 28px var(--spacing-md); cursor: pointer"
               >
-                Hỗ trợ .xlsx / .xls
+                <input
+                  id="fileInput"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  style="display: none"
+                />
+                <div class="flex col center gap-sm" style="text-align: center">
+                  <div
+                    class="flex center"
+                    style="
+                      width: 62px;
+                      height: 62px;
+                      border-radius: 18px;
+                      background: linear-gradient(
+                        135deg,
+                        rgba(255, 255, 255, 0.14),
+                        rgba(255, 255, 255, 0.04)
+                      );
+                      position: relative;
+                      box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.5);
+                    "
+                  >
+                    <i
+                      class="fa-solid fa-file-excel"
+                      style="
+                        font-size: 1.6rem;
+                        background: linear-gradient(135deg, #21d4fd, #b721ff);
+                        -webkit-background-clip: text;
+                        background-clip: text;
+                        color: transparent;
+                      "
+                    ></i>
+                  </div>
+                  <div style="font-weight: 600; letter-spacing: 0.5px">
+                    Kéo & Thả hoặc Chọn Tệp
+                  </div>
+                  <div
+                    class="text-tertiary"
+                    style="font-size: 0.65rem; line-height: 1.4"
+                  >
+                    Chấp nhận: <strong>.xlsx</strong>, <strong>.xls</strong
+                    ><br />
+                    Dung lượng hợp lý (&lt; 5MB khuyến nghị)
+                  </div>
+                  <button
+                    type="button"
+                    id="browseFileBtn"
+                    class="btn btn-outline btn-small"
+                    style="margin-top: 4px"
+                  >
+                    <i class="fa-solid fa-folder-open"></i
+                    ><span>Chọn tệp...</span>
+                  </button>
+                  <div
+                    id="selectedFileInfo"
+                    class="badge hidden"
+                    style="
+                      margin-top: 6px;
+                      background: rgba(255, 255, 255, 0.15);
+                    "
+                  ></div>
+                </div>
+                <div
+                  id="fileError"
+                  class="text-tertiary hidden"
+                  style="color: #ff8a8a; margin-top: 10px; font-size: 0.65rem"
+                ></div>
               </div>
             </div>
             <div class="form-col" style="max-width: 280px">
@@ -345,7 +411,7 @@
       </div>
     </div>
     <footer class="app-footer text-tertiary">
-      © <span id="year"></span> Tavily Search Module.
+      © <span id="year"></span> PuuGoo
     </footer>
     <script type="module" src="/ui.js"></script>
     <script type="module" src="/hotelSearchTavily.js"></script>
@@ -416,6 +482,121 @@
             },
             { once: true }
           );
+        }
+
+        // Modern file input (drag & drop + browse) – Vietnamese labels
+        const dropZone = document.getElementById("fileDropZone");
+        const fileInputModern = document.getElementById("fileInput");
+        const browseBtn = document.getElementById("browseFileBtn");
+        const fileInfo = document.getElementById("selectedFileInfo");
+        const fileError = document.getElementById("fileError");
+        function resetError() {
+          if (fileError) {
+            fileError.textContent = "";
+            fileError.classList.add("hidden");
+          }
+        }
+        function showError(msg) {
+          if (fileError) {
+            fileError.textContent = msg;
+            fileError.classList.remove("hidden");
+          }
+        }
+        function updateFileInfo(f) {
+          if (!fileInfo) return;
+          if (!f) {
+            fileInfo.classList.add("hidden");
+            fileInfo.textContent = "";
+            return;
+          }
+          const sizeKB = Math.round(f.size / 1024);
+          fileInfo.textContent = `${f.name} • ${sizeKB} KB`;
+          fileInfo.classList.remove("hidden");
+        }
+        function validateFile(f) {
+          resetError();
+          if (!f) return false;
+          const extOk = /\.(xlsx|xls)$/i.test(f.name);
+          if (!extOk) {
+            showError("Định dạng không hợp lệ. Chỉ chấp nhận .xlsx hoặc .xls");
+            return false;
+          }
+          const maxSize = 15 * 1024 * 1024; // 15MB
+          if (f.size > maxSize) {
+            showError("Tệp quá lớn (>15MB). Vui lòng chọn tệp nhỏ hơn.");
+            return false;
+          }
+          return true;
+        }
+        function handleFiles(files) {
+          if (!files || !files.length) return;
+          const f = files[0];
+          if (!validateFile(f)) {
+            if (fileInputModern) fileInputModern.value = "";
+            updateFileInfo(null);
+            return;
+          }
+          updateFileInfo(f);
+          if (dropZone) dropZone.classList.add("has-file");
+        }
+        if (browseBtn) {
+          browseBtn.addEventListener(
+            "click",
+            () => fileInputModern && fileInputModern.click()
+          );
+        }
+        if (dropZone) {
+          ["dragenter", "dragover"].forEach((evt) =>
+            dropZone.addEventListener(evt, (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              dropZone.classList.add("drag-over");
+            })
+          );
+          ["dragleave", "drop"].forEach((evt) =>
+            dropZone.addEventListener(evt, (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              dropZone.classList.remove("drag-over");
+            })
+          );
+          dropZone.addEventListener("drop", (e) => {
+            if (e.dataTransfer && e.dataTransfer.files) {
+              if (fileInputModern) fileInputModern.files = e.dataTransfer.files;
+              handleFiles(e.dataTransfer.files);
+            }
+          });
+          dropZone.addEventListener("click", (e) => {
+            if (fileInputModern) fileInputModern.click();
+          });
+        }
+        if (fileInputModern) {
+          fileInputModern.addEventListener("change", (e) =>
+            handleFiles(e.target.files)
+          );
+        }
+        // Right-click to clear
+        if (dropZone) {
+          dropZone.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            if (fileInputModern) fileInputModern.value = "";
+            updateFileInfo(null);
+            dropZone.classList.remove("has-file");
+          });
+        }
+        // Observe style change
+        if (dropZone) {
+          const observerFile = new MutationObserver(() => {
+            if (dropZone.classList.contains("has-file")) {
+              dropZone.style.borderColor = "#21d4fd";
+            } else {
+              dropZone.style.removeProperty("border-color");
+            }
+          });
+          observerFile.observe(dropZone, {
+            attributes: true,
+            attributeFilter: ["class"],
+          });
         }
       });
     </script>

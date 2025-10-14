@@ -534,6 +534,21 @@ document.addEventListener("DOMContentLoaded", function () {
         pauseBtn.textContent = "Tạm dừng";
       }
 
+      // Restore progress bar state on resume
+      const progressContainerResume =
+        document.getElementById("progressContainer");
+      const progressBarResume = document.getElementById("progressBar");
+      const progressTextResume = document.getElementById("progressText");
+      if (progressContainerResume) show(progressContainerResume);
+      if (progressBarResume && MAX_RUNS > 0) {
+        const done = runCount; // runCount reflects saved.results length
+        const pct = Math.min(100, Math.round((done / MAX_RUNS) * 100));
+        progressBarResume.style.width = pct + "%";
+        if (progressTextResume) {
+          progressTextResume.textContent = `${pct}% (${done}/${MAX_RUNS})`;
+        }
+      }
+
       // start processing automatically from saved.nextIndex
       (async () => {
         try {
