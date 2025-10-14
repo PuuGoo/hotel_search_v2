@@ -1,8 +1,128 @@
 import axios from "https://cdn.jsdelivr.net/npm/axios@1.6.8/dist/esm/axios.min.js";
 import { Toasts } from "/ui.js";
 
+// Global fuzzy config so helper functions outside DOMContentLoaded can access
+let fuzzyEnabled = false; // persisted via localStorage tavily_fuzzy_cfg
+let fuzzyThreshold = 0.78; // 0 - 1
+let fuzzyWorker = null; // worker instance
+let pendingFuzzyQueue = [];
+
 // Đảm bảo rằng script chỉ chạy khi DOM đã tải xong
 document.addEventListener("DOMContentLoaded", function () {
+  // Fuzzy worker + config initialization (use existing globals)
+  try {
+    fuzzyWorker = new Worker("/fuzzyWorker.js");
+    fuzzyWorker.addEventListener("message", (e) => {
+      const msg = e.data || {};
+      if (msg.type === "scored") {
+        const pr = pendingFuzzyQueue.shift();
+        if (!pr) return;
+        const scores = msg.scores || [];
+        let max = -1;
+        let best = null;
+        scores.forEach((s) => {
+          if (s.score > max) {
+            max = s.score;
+            best = s;
+          }
+        });
+        if (pr.resultObj) {
+          pr.resultObj.fuzzy = max >= 0 ? max : null;
+          pr.resultObj.fuzzyBreakdown = best;
+          // Persist updated fuzzy info into session storage (previously we saved before async result arrived)
+          try {
+            const sess =
+              JSON.parse(localStorage.getItem("tavily_session") || "null") ||
+              {};
+            if (Array.isArray(sess.results)) {
+              // Find matching result by unique order (fallback by reference) and update stored copy
+              const idx = sess.results.findIndex(
+                (r) => r && pr.resultObj && r.order === pr.resultObj.order
+              );
+              if (idx >= 0) {
+                sess.results[idx].fuzzy = pr.resultObj.fuzzy;
+                sess.results[idx].fuzzyBreakdown = pr.resultObj.fuzzyBreakdown;
+              }
+              localStorage.setItem("tavily_session", JSON.stringify(sess));
+            }
+          } catch (persistErr) {
+            // swallow
+          }
+        }
+        // Console logging for diagnostic visibility per row
+        try {
+          if (best) {
+            const candidate = pr.candidates && pr.candidates[best.index];
+            const order = pr.resultObj ? pr.resultObj.order : undefined;
+            const hotelName = pr.resultObj ? pr.resultObj.hotelName : undefined;
+            console.log("[FUZZY]", {
+              order,
+              hotelName,
+              matchedTitle: candidate ? candidate.title : undefined,
+              url: candidate ? candidate.url : undefined,
+              score: Number(best.score.toFixed(3)),
+              percent: Math.round(best.score * 100),
+              nameSim: Number((best.nameSim || 0).toFixed(3)),
+              lev: Number((best.lev || 0).toFixed(3)),
+              jw: Number((best.jw || 0).toFixed(3)),
+              hostPathScore: Number((best.hostPathScore || 0).toFixed(3)),
+              bonus: Number((best.bonus || 0).toFixed(3)),
+              penalty: Number((best.penalty || 0).toFixed(3)),
+              flags: best.flags || [],
+            });
+          } else if (pr && pr.resultObj) {
+            console.log(
+              "[FUZZY] No candidates",
+              pr.resultObj.order,
+              pr.resultObj.hotelName
+            );
+          }
+        } catch (logErr) {
+          // swallow logging errors
+        }
+        if (pr.rowRef) {
+          const cell = pr.rowRef.querySelector('[data-col="fuzzy"]');
+          if (cell) {
+            if (max < 0) {
+              cell.textContent = "-";
+            } else {
+              const flagMap = {
+                TITLE_PREFIX_MATCH: "Tiêu đề bắt đầu bằng tên khách sạn",
+                TOKEN_SEQUENCE_MATCH: "Đủ token theo đúng thứ tự",
+                TOKEN_PERMUTATION_MATCH:
+                  "Đủ hết token (bỏ từ chung) – thứ tự bất kỳ",
+                AGGREGATOR: "Trang tổng hợp (aggregator)",
+                OFFICIAL: "Có dấu hiệu trang chính thức",
+                AGG_BONUS: "Aggregator path phù hợp (bonus)",
+                GEO_MISMATCH: "Thiếu/khác token địa lý (phạt)",
+              };
+              const flagsDesc = (best.flags || [])
+                .map((f) => flagMap[f] || f)
+                .join("; ");
+              const tip = best
+                ? `Tên:${(best.nameSim || 0).toFixed(3)} | HostPath:${(
+                    best.hostPathScore || 0
+                  ).toFixed(3)} | Bonus:${(best.bonus || 0).toFixed(
+                    2
+                  )} | Penalty:${(best.penalty || 0).toFixed(2)}${
+                    flagsDesc ? "\n" + flagsDesc : ""
+                  }`
+                : "";
+              cell.innerHTML = `<span class=\"badge\" title=\"${tip}\" style=\"background:${
+                max >= fuzzyThreshold
+                  ? "rgba(46,204,113,0.18)"
+                  : "rgba(255,255,255,0.08)"
+              };color:${
+                max >= fuzzyThreshold ? "#27ae60" : "var(--text-tertiary)"
+              }\">${max.toFixed(3)}</span>`;
+            }
+          }
+        }
+      }
+    });
+  } catch (e) {
+    console.warn("Fuzzy worker init failed", e);
+  }
   // keep runCount but allow resume sessions
   // localStorage.removeItem("runCount");
   let MAX_RUNS = 0;
@@ -71,6 +191,38 @@ document.addEventListener("DOMContentLoaded", function () {
   }
   function hideResultsSection() {
     hide(resultsSection);
+  }
+  // Helper: (Re)queue fuzzy scoring for rows missing fuzzy score (used after reload / resume)
+  function recomputeMissingFuzzy() {
+    if (!fuzzyEnabled || !fuzzyWorker) return;
+    const results = window.currentResults || [];
+    results.forEach((r) => {
+      if (
+        r &&
+        r.fuzzy == null &&
+        Array.isArray(r.matchedLinks) &&
+        r.matchedLinks.length
+      ) {
+        const candidates = r.matchedLinks.map((l) => ({
+          title: l.title || l.url,
+          url: l.url,
+        }));
+        pendingFuzzyQueue.push({
+          rowRef: null,
+          resultObj: r,
+          expected: candidates.length,
+          candidates,
+        });
+        try {
+          fuzzyWorker.postMessage({
+            type: "score",
+            query: r.hotelName || "",
+            candidates,
+            opts: { titleOnly: true },
+          });
+        } catch (e) {}
+      }
+    });
   }
   // If there's no saved session, clear any stale runCount so page doesn't show e.g. 10/0
   try {
@@ -196,6 +348,8 @@ document.addEventListener("DOMContentLoaded", function () {
                   ? saved.results.length
                   : runCount;
               updateCounter(counterEl, runCount, jsonData.length);
+              // After restoring, recompute fuzzy for rows that were not persisted (older code didn't persist)
+              recomputeMissingFuzzy();
             } else {
               // different file -- overwrite session later
               startIndex = 0;
@@ -364,6 +518,7 @@ document.addEventListener("DOMContentLoaded", function () {
               resultsFromBraveArray.push({
                 percentage: isMatch.percentage,
                 matchedLink: pageUrl,
+                title: result.title || "",
               });
             }
           }
@@ -387,7 +542,11 @@ document.addEventListener("DOMContentLoaded", function () {
               return getPriority(a.matchedLink) - getPriority(b.matchedLink);
             });
           matchedLink = resultsFromBraveArray.map(
-            ({ percentage, matchedLink }) => ({ url: matchedLink, percentage })
+            ({ percentage, matchedLink, title }) => ({
+              url: matchedLink,
+              percentage,
+              title,
+            })
           );
         }
       } catch (error) {
@@ -406,10 +565,15 @@ document.addEventListener("DOMContentLoaded", function () {
         hotelName,
         hotelAddress,
         matchedLinks: matchedLink
-          ? matchedLink.map((m) => ({ url: m.url, percentage: m.percentage }))
+          ? matchedLink.map((m) => ({
+              url: m.url,
+              percentage: m.percentage,
+              title: m.title || "",
+            }))
           : [],
         percentage: Math.round(maxPct),
         status: statusLabel,
+        fuzzy: null,
       });
       window.currentResults = results;
       // sort lại theo trạng thái hiện tại
@@ -436,7 +600,38 @@ document.addEventListener("DOMContentLoaded", function () {
       const start = (currentPage - 1) * pageSize;
       const end = start + pageSize - 1;
       if (newIndex >= start && newIndex <= end) {
-        appendResultRow(results[results.length - 1]);
+        const newRowObj = results[results.length - 1];
+        appendResultRow(newRowObj);
+        if (fuzzyEnabled && fuzzyWorker) {
+          try {
+            const lastTr =
+              document.getElementById("resultsBody")?.lastElementChild
+                ?.previousElementSibling || null;
+            const candidates = (newRowObj.matchedLinks || []).map((l) => ({
+              title: l.title || l.url,
+              url: l.url,
+            }));
+            if (!candidates.length) {
+              if (lastTr) {
+                const c = lastTr.querySelector('[data-col="fuzzy"]');
+                if (c) c.textContent = "-";
+              }
+            } else {
+              pendingFuzzyQueue.push({
+                rowRef: lastTr,
+                resultObj: newRowObj,
+                expected: candidates.length,
+                candidates, // store for console logging
+              });
+              fuzzyWorker.postMessage({
+                type: "score",
+                query: newRowObj.hotelName || "",
+                candidates,
+                opts: { titleOnly: true },
+              });
+            }
+          } catch (e) {}
+        }
       }
       currentIndex++;
       const pct = Math.round((currentIndex / MAX_RUNS) * 100);
@@ -818,6 +1013,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
       // Hiển thị bảng kết quả live khi resume hoặc reload
       showResultsSection();
+
+      // Recompute any missing fuzzy scores (from previous session without persistence or rows not on current page)
+      recomputeMissingFuzzy();
 
       // prepare UI for running
       const searchBtn = document.getElementById("searchButton");
@@ -1397,6 +1595,9 @@ function appendResultRow(row) {
     <td>${escapeHtml(row.order)}</td>
     <td>${escapeHtml(row.hotelNo)}</td>
     <td>${escapeHtml(pct)}</td>
+    <td data-col="fuzzy" style="font-size:.6rem;color:var(--text-tertiary)">${
+      row.fuzzy != null ? escapeHtml(row.fuzzy.toFixed(3)) : "-"
+    }</td>
     <td><span style="padding:6px 8px;border-radius:8px;background:${
       status === "Matched" ? "#e6f7ef" : "#fff3f2"
     };color:${
@@ -1508,6 +1709,21 @@ function appendResultRow(row) {
     const filterEl = document.getElementById("filterInput");
     if (filterEl) filterEl.focus();
   } catch (e) {}
+
+  // Re-evaluate fuzzy cell color if fuzzy data present and feature toggled
+  if (fuzzyEnabled && row.fuzzy != null) {
+    const cell = tr.querySelector('[data-col="fuzzy"]');
+    if (cell) {
+      const val = Number(row.fuzzy) || 0;
+      cell.innerHTML = `<span class="badge" style="background:${
+        val >= fuzzyThreshold
+          ? "rgba(46,204,113,0.18)"
+          : "rgba(255,255,255,0.08)"
+      };color:${
+        val >= fuzzyThreshold ? "#27ae60" : "var(--text-tertiary)"
+      }">${val.toFixed(3)}</span>`;
+    }
+  }
 
   // add click-to-copy on hotel name and address cells separately
   (function addCopyOnClickSeparate() {
@@ -1708,5 +1924,116 @@ document.addEventListener("keydown", (e) => {
         openAll.click();
       }
     }
+  }
+});
+
+// Fuzzy UI bindings outside DOMContentLoaded because inputs exist already (after script load they may not yet); ensure after load
+window.addEventListener("load", () => {
+  const enableEl = document.getElementById("fuzzyEnable");
+  const thrEl = document.getElementById("fuzzyThreshold");
+  const infoBtn = document.getElementById("fuzzyInfoBtn");
+  if (enableEl) {
+    // load saved state
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem("tavily_fuzzy_cfg") || "null"
+      );
+      if (saved) {
+        enableEl.checked = !!saved.enabled;
+        if (thrEl && typeof saved.threshold === "number") {
+          thrEl.value = saved.threshold.toFixed(2);
+          fuzzyThreshold = saved.threshold;
+        }
+        fuzzyEnabled = !!saved.enabled;
+      }
+    } catch (e) {}
+    enableEl.addEventListener("change", () => {
+      fuzzyEnabled = enableEl.checked;
+      persistFuzzyCfg();
+    });
+  }
+  if (thrEl) {
+    thrEl.addEventListener("input", () => {
+      const v = parseFloat(thrEl.value);
+      if (!isNaN(v) && v >= 0 && v <= 1) {
+        fuzzyThreshold = v;
+        persistFuzzyCfg();
+        recolorFuzzyCells();
+      }
+    });
+  }
+  if (infoBtn) {
+    infoBtn.addEventListener("click", () => {
+      if (!window.Toasts && !Toasts) {
+        alert(
+          "Fuzzy = đo độ giống tên khách sạn (Levenshtein + Jaro-Winkler + Domain). Ngưỡng 0.80-0.85 thường tốt."
+        );
+        return;
+      }
+      const html = `<div style=\"text-align:left;line-height:1.45;font-size:.7rem;max-height:55vh;overflow:auto\">
+  <strong>Fuzzy Score (Phiên bản Title-Only)</strong><br/>
+  Đo mức độ giống giữa <em>Tên khách sạn trong file</em> và <em>Tiêu đề trang</em> của từng link tìm được.<br/><br/>
+  <strong>1. Thành phần cơ bản</strong><br/>
+  • <u>Levenshtein</u>: Số bước chỉnh ký tự tối thiểu để biến A→B. Ít bước = giống hơn.<br/>
+  • <u>Jaro‑Winkler</u>: Ưu tiên ký tự trùng và phần đầu (prefix) giống nhau.<br/>
+  • Hệ thống trộn 2 giá trị: <code>nameSim = (Levenshtein + JaroWinkler)/2</code> rồi dùng trực tiếp làm điểm (0..1) ở chế độ Title Only.<br/>
+  • Domain / path hiện <em>không cộng vào</em> vì đang chạy Title Only (hostPathScore = 0).<br/><br/>
+  <strong>2. Override (đẩy điểm lên 1.000)</strong><br/>
+  Nếu thỏa bất kỳ điều kiện sau, điểm = 1.000 và thêm flag tương ứng:<br/>
+  • <b>TITLE_PREFIX_MATCH</b>: Tiêu đề (sau khi bỏ hậu tố brand như “- Agoda”) trùng hoặc bắt đầu bằng tên khách sạn.<br/>
+  • <b>TOKEN_SEQUENCE_MATCH</b>: Toàn bộ token tên khách sạn xuất hiện tuần tự trong tiêu đề (có thể xen thêm từ phụ).<br/>
+  • <b>TOKEN_PERMUTATION_MATCH</b>: Tập token tên khách sạn (bỏ các từ chung: hotel, resort, the...) đều xuất hiện trong tiêu đề, thứ tự bất kỳ, cho phép dư token phụ.<br/><br/>
+  <strong>3. Các cờ (Flags) khác</strong><br/>
+  • OFFICIAL: Domain chứa ≥2 token mạnh từ tên (loại bỏ từ chung) → gợi ý trang chính thức.<br/>
+  • AGGREGATOR: Thuộc site trung gian (booking, agoda...).<br/>
+  • AGG_BONUS: Trang aggregator có path khớp tốt (áp dụng khi không ở title-only).<br/>
+  • GEO_MISMATCH: Thiếu token địa lý quan trọng xuất hiện trong tên.<br/><br/>
+  <strong>4. Màu và Ngưỡng</strong><br/>
+  • Badge Xanh: ≥ ngưỡng bạn đặt (ví dụ 0.78).<br/>
+  • Badge Xám: Dưới ngưỡng → kiểm tra thủ công nếu nghi ngờ.<br/>
+  Gợi ý nhanh: 0.85–0.90 (rất chặt) · 0.78 (cân bằng) · 0.72–0.75 (nới, cần soát).<br/><br/>
+  <strong>5. Chiến lược rà soát</strong><br/>
+  1) Chạy với ngưỡng 0.78. 2) Lọc/nhìn các dòng 0.70–0.78: nếu đa số vẫn đúng → hạ 0.75; nếu nhiều sai → tăng 0.82–0.85. 3) Giữ cố định một ngưỡng cho các batch để so sánh nhất quán.<br/><br/>
+  <strong>6. Ví dụ</strong><br/>
+  • "Executive Helena Hotels # Haven" ↔ tiêu đề giống hệt (sau khi bỏ “- Booking.com”) → 1.000 (TITLE_PREFIX_MATCH).<br/>
+  • "Imperial Hotel Da Nang" ↔ "Imperial Da Nang Hotel" → 1.000 (TOKEN_PERMUTATION_MATCH).<br/>
+  • "Intercontinetal Danag" (sai chính tả) ↔ "InterContinental Danang Sun Peninsula" ≈ ~0.74 (vì lỗi ký tự + thêm token).<br/>
+  • "Moonlight Boutique Saigon" ↔ "Moonlight Cruise Ha Long" ≈ ~0.5 (khác địa danh).<br/><br/>
+  <strong>7. Khi nào điểm thấp?</strong><br/>
+  • Sai chính tả nặng / thiếu nhiều token. • Tiêu đề chứa tên khác. • Địa danh không trùng. • Bị thêm brand dài làm lệch chuỗi (trước khi chuẩn hóa).<br/><br/>
+  <em>Lưu ý:</em> Hệ thống hiện không tự động loại bỏ link điểm thấp – chỉ hỗ trợ highlight. Có thể bổ sung bộ lọc sau.<br/>
+  <em>Tip:</em> Mở console (F12) để xem breakdown chi tiết mỗi dòng: lev, jw, flags.
+  </div>`;
+      Toasts.show(html, {
+        title: "Hướng dẫn Fuzzy",
+        type: "info",
+        timeout: 0,
+        html: true,
+      });
+    });
+  }
+  function persistFuzzyCfg() {
+    try {
+      localStorage.setItem(
+        "tavily_fuzzy_cfg",
+        JSON.stringify({ enabled: fuzzyEnabled, threshold: fuzzyThreshold })
+      );
+    } catch (e) {}
+  }
+  function recolorFuzzyCells() {
+    if (!fuzzyEnabled) return;
+    const rows = document.querySelectorAll("#resultsBody tr");
+    rows.forEach((tr) => {
+      const cell = tr.querySelector('[data-col="fuzzy"]');
+      if (!cell) return;
+      const valText = cell.textContent.trim();
+      const v = parseFloat(valText);
+      if (isNaN(v)) return;
+      cell.innerHTML = `<span class=\"badge\" style=\"background:${
+        v >= fuzzyThreshold ? "rgba(46,204,113,0.18)" : "rgba(255,255,255,0.08)"
+      };color:${
+        v >= fuzzyThreshold ? "#27ae60" : "var(--text-tertiary)"
+      }\">${v.toFixed(3)}</span>`;
+    });
   }
 });
