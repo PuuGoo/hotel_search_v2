@@ -184,6 +184,13 @@
                     <i class="fa-solid fa-trash-can"></i><span>Xóa</span>
                   </button>
                   <button
+                    id="snapshotArchiveButton"
+                    class="btn btn-outline btn-small hidden"
+                    title="Kho lưu các lần đã xóa/dừng"
+                  >
+                    <i class="fa-solid fa-box-archive"></i><span>Kho lưu</span>
+                  </button>
+                  <button
                     id="resumeSessionButton"
                     class="btn btn-outline btn-small hidden"
                   >
@@ -278,6 +285,84 @@
           </div>
         </div>
       </section>
+      <!-- Modal: Snapshot Archive -->
+      <div
+        id="snapshotArchiveModal"
+        class="modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="snapshotArchiveTitle"
+      >
+        <div class="modal-content glass-card" style="max-width: 640px">
+          <div class="modal-header">
+            <h3 id="snapshotArchiveTitle" style="margin: 0; font-size: 1rem">
+              <i class="fa-solid fa-box-archive"></i> Kho lưu kết quả
+            </h3>
+            <button
+              class="btn btn-sm btn-outline"
+              id="snapshotArchiveClose"
+              aria-label="Đóng"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div
+            class="modal-body"
+            style="max-height: 50vh; overflow: auto; font-size: 0.7rem"
+          >
+            <div
+              class="flex gap-xs"
+              style="margin-bottom: 6px; align-items: center"
+            >
+              <input
+                id="snapshotArchiveSearch"
+                type="text"
+                placeholder="Lọc theo nhãn..."
+                class="input"
+                style="flex: 1; font-size: 0.65rem; padding: 4px 8px"
+              />
+              <button
+                id="snapshotArchiveSearchClear"
+                class="btn btn-outline btn-small"
+                aria-label="Xóa lọc"
+              >
+                <i class="fa-solid fa-times"></i>
+              </button>
+            </div>
+            <div
+              class="text-tertiary"
+              style="font-size: 0.55rem; margin-bottom: 4px"
+            >
+              Double-click vào nhãn để đổi tên • Dùng nút 'Tiếp tục' để chạy
+              tiếp (nếu snapshot có dữ liệu allRows)
+            </div>
+            <div id="snapshotArchiveList" class="stack-sm"></div>
+          </div>
+          <div class="modal-footer flex gap-sm wrap">
+            <button
+              id="snapshotArchiveExportAll"
+              class="btn btn-outline btn-small"
+            >
+              <i class="fa-solid fa-file-export"></i
+              ><span>Xuất tất cả CSV</span>
+            </button>
+            <div style="flex: 1"></div>
+            <button
+              id="snapshotArchiveDeleteAll"
+              class="btn btn-outline btn-small"
+              style="--btn-accent: #c0392b"
+            >
+              <i class="fa-solid fa-trash"></i><span>Xóa tất cả</span>
+            </button>
+            <button
+              id="snapshotArchiveCloseFooter"
+              class="btn btn-primary btn-small"
+            >
+              <i class="fa-solid fa-check"></i><span>Đóng</span>
+            </button>
+          </div>
+        </div>
+      </div>
       <section
         id="panel-results"
         class="tab-panel"

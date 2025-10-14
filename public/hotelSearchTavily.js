@@ -12,6 +12,42 @@ document.addEventListener("DOMContentLoaded", function () {
   let stoppedPermanently =
     localStorage.getItem("tavily_stopped_permanently") === "1";
   let runCount = parseInt(localStorage.getItem("runCount") || "0");
+  // ===== Snapshot archive helpers =====
+  function loadArchivedSnapshots() {
+    try {
+      return JSON.parse(localStorage.getItem("tavily_snapshots") || "[]") || [];
+    } catch (e) {
+      return [];
+    }
+  }
+  function saveArchivedSnapshots(arr) {
+    try {
+      localStorage.setItem("tavily_snapshots", JSON.stringify(arr));
+    } catch (e) {}
+  }
+  function addSnapshot(label, data) {
+    const arr = loadArchivedSnapshots();
+    arr.push({
+      id: Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+      label,
+      ts: Date.now(),
+      runCount: data.runCount || 0,
+      maxRuns: data.maxRuns || 0,
+      results: (data.results || []).slice(0, 20000),
+      allRows: data.allRows ? data.allRows.slice(0, 50000) : null,
+    });
+    saveArchivedSnapshots(arr);
+    // reveal archive button if exists
+    try {
+      const b = document.getElementById("snapshotArchiveButton");
+      if (b) b.classList.remove("hidden");
+    } catch (e) {}
+    return arr[arr.length - 1];
+  }
+  function formatDate(ts) {
+    const d = new Date(ts);
+    return d.toLocaleString();
+  }
   // Pagination settings
   const PAGE_SIZES = [50, 100, 200, 500, 1000, 2000];
   let pageSize = parseInt(localStorage.getItem("tavily_pageSize") || "2000");
@@ -469,6 +505,21 @@ document.addEventListener("DOMContentLoaded", function () {
                 runCountSnapshot: runCount,
                 maxRunsSnapshot: MAX_RUNS,
               };
+              // attempt include allRows from session for possible continue
+              let allRowsForSnap = null;
+              try {
+                const sess = JSON.parse(
+                  localStorage.getItem("tavily_session") || "null"
+                );
+                if (sess && Array.isArray(sess.allRows))
+                  allRowsForSnap = sess.allRows;
+              } catch (e) {}
+              addSnapshot("Clear", {
+                results: window.__lastClearedSnapshot.results,
+                runCount: runCount,
+                maxRuns: MAX_RUNS,
+                allRows: allRowsForSnap,
+              });
               clearResultsTable();
               window.currentResults = [];
               hideResultsSection();
@@ -587,6 +638,21 @@ document.addEventListener("DOMContentLoaded", function () {
           stoppedAt: Date.now(),
         };
         localStorage.setItem("tavily_stop_snapshot", JSON.stringify(snap));
+        // include any session rows for continue
+        let allRowsForStop = null;
+        try {
+          const sess = JSON.parse(
+            localStorage.getItem("tavily_session") || "null"
+          );
+          if (sess && Array.isArray(sess.allRows))
+            allRowsForStop = sess.allRows;
+        } catch (e) {}
+        addSnapshot("Stop", {
+          results: snap.results,
+          runCount: snap.runCount,
+          maxRuns: snap.maxRuns,
+          allRows: allRowsForStop,
+        });
       } catch (e) {
         /* ignore */
       }
@@ -825,6 +891,240 @@ document.addEventListener("DOMContentLoaded", function () {
   window.stopSearch = () => {
     shouldStop = true;
   };
+
+  // ===== Snapshot Archive UI =====
+  (function initSnapshotArchive() {
+    const btn = document.getElementById("snapshotArchiveButton");
+    const modal = document.getElementById("snapshotArchiveModal");
+    const listEl = document.getElementById("snapshotArchiveList");
+    const searchInput = document.getElementById("snapshotArchiveSearch");
+    const searchClear = document.getElementById("snapshotArchiveSearchClear");
+    let currentFilter = "";
+    const closeEls = [
+      document.getElementById("snapshotArchiveClose"),
+      document.getElementById("snapshotArchiveCloseFooter"),
+    ];
+    const delAll = document.getElementById("snapshotArchiveDeleteAll");
+    const exportAll = document.getElementById("snapshotArchiveExportAll");
+    function filteredSnapshots() {
+      let arr = loadArchivedSnapshots();
+      if (currentFilter) {
+        const q = currentFilter.toLowerCase();
+        arr = arr.filter((s) => (s.label || "").toLowerCase().includes(q));
+      }
+      return arr;
+    }
+    function refreshList() {
+      if (!listEl) return;
+      const arr = filteredSnapshots();
+      if (!arr.length) {
+        listEl.innerHTML =
+          '<div class="text-tertiary">(Chưa có snapshot)</div>';
+        return;
+      }
+      listEl.innerHTML = arr
+        .map((s) => {
+          const pct = s.maxRuns
+            ? Math.round((s.runCount / s.maxRuns) * 100)
+            : s.runCount
+            ? 100
+            : 0;
+          const canContinue =
+            s.allRows &&
+            Array.isArray(s.allRows) &&
+            s.allRows.length > s.runCount;
+          return `<div class=\"glass-card\" data-id=\"${
+            s.id
+          }\" style=\"padding:8px;display:flex;gap:8px;align-items:center\">
+          <div class=\"snap-meta\" style=\"flex:1;min-width:160px;cursor:text\" data-act=\"rename\" data-id=\"${
+            s.id
+          }\" title=\"Double-click để đổi tên\">
+            <div class=\"snap-label\" style=\"font-weight:600;font-size:.75rem;word-break:break-word\">${
+              s.label
+            }</div>
+            <div style=\"font-size:.6rem;color:var(--text-tertiary)\">${new Date(
+              s.ts
+            ).toLocaleString()} • ${s.runCount}/${s.maxRuns} • ${pct}%</div>
+          </div>
+          <div class=\"flex gap-xs\">
+            <button class=\"btn btn-outline btn-small\" data-act=\"restore\" data-id=\"${
+              s.id
+            }\"><i class=\"fa-solid fa-rotate-left\"></i><span>Xem</span></button>
+            <button class=\"btn btn-outline btn-small\" data-act=\"csv\" data-id=\"${
+              s.id
+            }\"><i class=\"fa-solid fa-file-csv\"></i></button>
+            ${
+              canContinue
+                ? `<button class=\"btn btn-outline btn-small\" data-act=\"continue\" data-id=\"${s.id}\"><i class=\"fa-solid fa-play\"></i></button>`
+                : ""
+            }
+            <button class=\"btn btn-outline btn-small\" data-act=\"delete\" data-id=\"${
+              s.id
+            }\" style=\"--btn-accent:#c0392b\"><i class=\"fa-solid fa-xmark\"></i></button>
+          </div>
+        </div>`;
+        })
+        .join("");
+    }
+    function openModal() {
+      if (!modal) return;
+      refreshList();
+      show(modal, "flex");
+    }
+    function closeModal() {
+      if (modal) hide(modal);
+    }
+    if (btn) {
+      if (loadArchivedSnapshots().length) btn.classList.remove("hidden");
+      btn.addEventListener("click", openModal);
+    }
+    closeEls.forEach((el) => el && el.addEventListener("click", closeModal));
+    if (modal)
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+      });
+    if (listEl) {
+      listEl.addEventListener("click", (e) => {
+        const t = e.target.closest("button[data-act]");
+        if (!t) return;
+        const id = t.getAttribute("data-id");
+        const act = t.getAttribute("data-act");
+        let arr = loadArchivedSnapshots();
+        const idx = arr.findIndex((s) => s.id === id);
+        if (idx === -1) return;
+        const snap = arr[idx];
+        if (act === "restore") {
+          window.currentResults = (snap.results || []).slice();
+          runCount = snap.runCount || (window.currentResults || []).length;
+          MAX_RUNS = snap.maxRuns || runCount;
+          updateCounter(counterEl, runCount, MAX_RUNS);
+          showResultsSection();
+          clearResultsTable();
+          window.currentResults.forEach((r) => appendResultRow(r));
+          if (Toasts)
+            Toasts.show("Đã khôi phục snapshot", {
+              type: "success",
+              title: "Khôi phục",
+            });
+        } else if (act === "csv") {
+          downloadCSV(
+            snap.results || [],
+            `snapshot_${snap.label}_${snap.id}.csv`
+          );
+        } else if (act === "delete") {
+          arr.splice(idx, 1);
+          saveArchivedSnapshots(arr);
+          refreshList();
+          if (!arr.length && btn) btn.classList.add("hidden");
+        } else if (act === "continue") {
+          if (!snap.allRows || !Array.isArray(snap.allRows)) {
+            if (Toasts)
+              Toasts.show("Snapshot không có dữ liệu nguồn để chạy tiếp", {
+                type: "error",
+                title: "Không thể tiếp tục",
+              });
+            return;
+          }
+          // Prepare session and auto-resume from snap.runCount
+          try {
+            const sess = {
+              allRows: snap.allRows,
+              results: (snap.results || []).slice(),
+              nextIndex: snap.runCount,
+              maxRuns: snap.maxRuns,
+            };
+            localStorage.setItem("tavily_session", JSON.stringify(sess));
+            localStorage.removeItem("tavily_stopped_permanently");
+            localStorage.setItem("runCount", String(snap.runCount || 0));
+            // reset stop flags & start processing immediately
+            shouldStop = false;
+            stoppedPermanently = false;
+            window.currentResults = (snap.results || []).slice();
+            runCount = snap.runCount || window.currentResults.length;
+            MAX_RUNS =
+              snap.maxRuns || (snap.allRows ? snap.allRows.length : runCount);
+            updateCounter(counterEl, runCount, MAX_RUNS);
+            showResultsSection();
+            clearResultsTable();
+            window.currentResults.forEach((r) => appendResultRow(r));
+            // show progress bar early
+            const progressContainer =
+              document.getElementById("progressContainer");
+            if (progressContainer) show(progressContainer);
+            const progressBar = document.getElementById("progressBar");
+            const pct = MAX_RUNS ? Math.round((runCount / MAX_RUNS) * 100) : 0;
+            if (progressBar) {
+              progressBar.style.width = pct + "%";
+              progressBar.setAttribute("aria-valuenow", String(pct));
+              progressBar.setAttribute(
+                "aria-valuetext",
+                `${pct} phần trăm (${runCount}/${MAX_RUNS})`
+              );
+            }
+            if (Toasts)
+              Toasts.show("Đang tiếp tục từ snapshot...", {
+                type: "info",
+                title: "Tiếp tục",
+              });
+            // Trigger processing of remaining rows asynchronously
+            setTimeout(() => {
+              try {
+                processRows(snap.allRows, snap.runCount || 0);
+              } catch (e) {}
+            }, 100);
+          } catch (e) {
+            if (Toasts)
+              Toasts.show("Lỗi tiếp tục snapshot", {
+                type: "error",
+                title: "Lỗi",
+              });
+          }
+        }
+      });
+      // Rename via double-click
+      listEl.addEventListener("dblclick", (e) => {
+        const meta = e.target.closest(".snap-meta");
+        if (!meta) return;
+        const id = meta.getAttribute("data-id");
+        if (!id) return;
+        let arr = loadArchivedSnapshots();
+        const snap = arr.find((s) => s.id === id);
+        if (!snap) return;
+        const newName = prompt("Tên mới cho snapshot:", snap.label);
+        if (!newName) return;
+        snap.label = newName.trim().slice(0, 80) || snap.label;
+        saveArchivedSnapshots(arr);
+        refreshList();
+      });
+    }
+    if (searchInput) {
+      searchInput.addEventListener("input", () => {
+        currentFilter = searchInput.value.trim();
+        refreshList();
+      });
+    }
+    if (searchClear) {
+      searchClear.addEventListener("click", () => {
+        currentFilter = "";
+        if (searchInput) searchInput.value = "";
+        refreshList();
+      });
+    }
+    if (delAll)
+      delAll.addEventListener("click", () => {
+        saveArchivedSnapshots([]);
+        refreshList();
+        const b = document.getElementById("snapshotArchiveButton");
+        if (b) b.classList.add("hidden");
+      });
+    if (exportAll)
+      exportAll.addEventListener("click", () => {
+        const arr = loadArchivedSnapshots();
+        arr.forEach((s) =>
+          downloadCSV(s.results || [], `snapshot_${s.label}_${s.id}.csv`)
+        );
+      });
+  })();
 
   // Biến lưu trạng thái sort cho từng cột
   let orderSortAsc = true;
