@@ -20,14 +20,19 @@ document.addEventListener("DOMContentLoaded", function () {
   function show(el, display) {
     if (!el) return;
     el.classList.remove("hidden");
-    if (display) el.style.display = display; else el.style.removeProperty("display");
+    if (display) el.style.display = display;
+    else el.style.removeProperty("display");
   }
   function hide(el) {
     if (!el) return;
     if (!el.classList.contains("hidden")) el.classList.add("hidden");
   }
-  function showResultsSection() { show(resultsSection); }
-  function hideResultsSection() { hide(resultsSection); }
+  function showResultsSection() {
+    show(resultsSection);
+  }
+  function hideResultsSection() {
+    hide(resultsSection);
+  }
   // If there's no saved session, clear any stale runCount so page doesn't show e.g. 10/0
   try {
     const s = localStorage.getItem("tavily_session");
@@ -61,11 +66,11 @@ document.addEventListener("DOMContentLoaded", function () {
       // Disable button and show spinner
       if (searchBtn) searchBtn.disabled = true;
       // reveal spinner & pause button early
-  show(spinnerEl, "flex");
-  const pauseResumeBtn = document.getElementById("pauseResumeButton");
-  show(pauseResumeBtn, "inline-flex");
-  const progressContainerEl = document.getElementById("progressContainer");
-  show(progressContainerEl);
+      show(spinnerEl, "flex");
+      const pauseResumeBtn = document.getElementById("pauseResumeButton");
+      show(pauseResumeBtn, "inline-flex");
+      const progressContainerEl = document.getElementById("progressContainer");
+      show(progressContainerEl);
       const fileInput = document.getElementById("fileInput");
       if (!fileInput || fileInput.files.length === 0) {
         alert("Vui lòng chọn một file Excel!");
@@ -371,7 +376,8 @@ document.addEventListener("DOMContentLoaded", function () {
       currentIndex++;
       const pct = Math.round((currentIndex / MAX_RUNS) * 100);
       if (progressBar) progressBar.style.width = pct + "%";
-      if (progressText) progressText.textContent = `${pct}% (${currentIndex}/${MAX_RUNS})`;
+      if (progressText)
+        progressText.textContent = `${pct}% (${currentIndex}/${MAX_RUNS})`;
       console.log("Dong thu:", currentIndex, "hoan thanh.");
       isProcessingRow = false;
     }
@@ -439,7 +445,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (searchBtn) searchBtn.disabled = false;
     hide(spinnerEl);
     hide(pauseBtn);
-  hide(progressContainerEl);
+    hide(progressContainer);
   }
 
   // Pause/Resume handling
@@ -1119,38 +1125,7 @@ function normalizeToken(s) {
     .trim();
 }
 
-// Cấu hình các trang và các nút liên quan
-const pages = {
-  SEARCHTAVILY: ["SEARCHGO"],
-};
-
-// Hàm thay đổi nội dung và hiển thị nút
-function switchPage(page) {
-  // Cập nhật tiêu đề trang
-  document.querySelector("h1").textContent = `Chức năng ${page}`;
-
-  // Ẩn tất cả các trang
-  document.querySelectorAll(".page").forEach((p) => (p.style.display = "none"));
-
-  // Hiển thị trang hiện tại
-  document.getElementById(`page${page}`).style.display = "block";
-
-  // Cập nhật các nút chức năng
-  const buttonContainer = document.querySelector(".button-container");
-  buttonContainer.innerHTML = ""; // Xóa các nút hiện tại
-  pages[page].forEach((p) => {
-    const a = document.createElement("a");
-    a.href = p;
-    const button = document.createElement("button");
-    button.textContent = `Chức năng ${p}`;
-    button.onclick = () => switchPage(p);
-    a.appendChild(button);
-    buttonContainer.appendChild(a);
-  });
-}
-
-// Khởi tạo mặc định là trang A
-switchPage("SEARCHTAVILY");
+// Legacy multi-page navigation removed as layout now uses tabs only.
 
 // Global keyboard shortcuts
 document.addEventListener("keydown", (e) => {

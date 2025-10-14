@@ -7,9 +7,17 @@
     <meta name="description" content="Tìm kiếm khách sạn từ Excel với Tavily" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/app.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.2/xlsx.full.min.js"></script>
   </head>
@@ -17,69 +25,207 @@
     <a href="#pageSEARCHTAVILY" class="skip-link">Bỏ qua tới nội dung</a>
     <header class="app-header no-print">
       <div class="app-header-inner">
-        <div class="brand"><span class="logo"><i class="fa-solid fa-hotel"></i></span> <span>Tavily Search</span></div>
-        <div class="flex gap-sm center" style="margin-left:auto">
+        <div class="brand">
+          <span class="logo"><i class="fa-solid fa-hotel"></i></span>
+          <span>Tavily Search</span>
+        </div>
+        <div class="flex gap-sm center" style="margin-left: auto">
           <div class="clock" aria-label="Đồng hồ">--:--:--</div>
-          <button id="themeToggle" type="button" class="btn btn-outline btn-pill" title="Đổi giao diện (Alt+D)"><i class="fa-solid fa-circle-half-stroke"></i></button>
-          <a href="/logout" class="btn btn-outline btn-small"><i class="fa-solid fa-right-from-bracket"></i><span>Đăng xuất</span></a>
+          <button
+            id="themeToggle"
+            type="button"
+            class="btn btn-outline btn-pill"
+            title="Đổi giao diện (Alt+D)"
+          >
+            <i class="fa-solid fa-circle-half-stroke"></i>
+          </button>
+          <a href="/logout" class="btn btn-outline btn-small"
+            ><i class="fa-solid fa-right-from-bracket"></i
+            ><span>Đăng xuất</span></a
+          >
         </div>
       </div>
     </header>
-    <main class="container stack-lg" style="padding-top:var(--spacing-lg);padding-bottom:var(--spacing-xl)">
-      <h1 class="gradient-text" style="margin:0;font-size:1.8rem">Tìm kiếm khách sạn - Child</h1>
-      <p class="text-secondary" style="margin:0 0 var(--spacing-md); max-width:720px">Upload file Excel (các cột: No, Child's Name, Child's Address). Quá trình tìm kiếm chạy live và kết quả hiển thị ngay lập tức.</p>
+    <main
+      class="container stack-lg"
+      style="padding-top: var(--spacing-lg); padding-bottom: var(--spacing-xl)"
+    >
+      <h1 class="gradient-text" style="margin: 0; font-size: 1.8rem">
+        Tìm kiếm khách sạn - Child
+      </h1>
+      <p
+        class="text-secondary"
+        style="margin: 0 0 var(--spacing-md); max-width: 720px"
+      >
+        Upload file Excel (các cột: No, Child's Name, Child's Address). Quá
+        trình tìm kiếm chạy live và kết quả hiển thị ngay lập tức.
+      </p>
       <div class="tabs" data-tabs role="tablist" aria-label="Điều hướng">
-        <button role="tab" aria-selected="true" data-target="panel-upload"><i class="fa-solid fa-file-import"></i> <span>Upload</span></button>
-        <button role="tab" aria-selected="false" data-target="panel-results"><i class="fa-solid fa-table"></i> <span>Kết quả</span></button>
+        <button role="tab" aria-selected="true" data-target="panel-upload">
+          <i class="fa-solid fa-file-import"></i> <span>Upload</span>
+        </button>
+        <button role="tab" aria-selected="false" data-target="panel-results">
+          <i class="fa-solid fa-table"></i> <span>Kết quả</span>
+        </button>
       </div>
-      <section id="panel-upload" class="tab-panel active" role="tabpanel" tabindex="0">
-        <div id="pageSEARCHTAVILY" class="glass-card gradient" role="region" aria-labelledby="sectionInputTitle">
-          <div class="card-header"><i class="fa-solid fa-database"></i> Nhập dữ liệu</div>
+      <section
+        id="panel-upload"
+        class="tab-panel active"
+        role="tabpanel"
+        tabindex="0"
+      >
+        <div
+          id="pageSEARCHTAVILY"
+          class="glass-card gradient"
+          role="region"
+          aria-labelledby="sectionInputTitle"
+        >
+          <div class="card-header">
+            <i class="fa-solid fa-database"></i> Nhập dữ liệu
+          </div>
           <div class="form-row">
             <div class="form-col">
               <label for="fileInput">File Excel</label>
               <input id="fileInput" type="file" accept=".xlsx,.xls" />
-              <div class="text-tertiary" style="font-size:.65rem;margin-top:6px">Hỗ trợ .xlsx / .xls</div>
+              <div
+                class="text-tertiary"
+                style="font-size: 0.65rem; margin-top: 6px"
+              >
+                Hỗ trợ .xlsx / .xls
+              </div>
             </div>
-            <div class="form-col" style="max-width:280px">
+            <div class="form-col" style="max-width: 280px">
               <label>Trạng thái</label>
-              <div class="stack-sm" style="font-size:.75rem">
-                <div id="counter" class="badge" style="background:rgba(255,255,255,0.12)">0/0 lượt tìm kiếm</div>
+              <div class="stack-sm" style="font-size: 0.75rem">
+                <div
+                  id="counter"
+                  class="badge"
+                  style="background: rgba(255, 255, 255, 0.12)"
+                >
+                  0/0 lượt tìm kiếm
+                </div>
                 <div class="flex gap-xs wrap">
-                  <button id="downloadCSVButton" class="btn btn-outline btn-small hidden"><i class="fa-solid fa-download"></i><span>CSV</span></button>
-                  <button id="clearResultsButton" class="btn btn-outline btn-small hidden"><i class="fa-solid fa-trash-can"></i><span>Xóa</span></button>
-                  <button id="resumeSessionButton" class="btn btn-outline btn-small hidden"><i class="fa-solid fa-play"></i><span>Resume</span></button>
+                  <button
+                    id="downloadCSVButton"
+                    class="btn btn-outline btn-small hidden"
+                  >
+                    <i class="fa-solid fa-download"></i><span>CSV</span>
+                  </button>
+                  <button
+                    id="clearResultsButton"
+                    class="btn btn-outline btn-small hidden"
+                  >
+                    <i class="fa-solid fa-trash-can"></i><span>Xóa</span>
+                  </button>
+                  <button
+                    id="resumeSessionButton"
+                    class="btn btn-outline btn-small hidden"
+                  >
+                    <i class="fa-solid fa-play"></i><span>Resume</span>
+                  </button>
                 </div>
               </div>
             </div>
           </div>
-          <div class="stack-sm" style="margin-top:var(--spacing-md)">
+          <div class="stack-sm" style="margin-top: var(--spacing-md)">
             <div class="flex gap-sm wrap">
-              <button id="searchButton" type="button" class="btn btn-primary btn-modern" style="flex:1"><i class="fa-solid fa-magnifying-glass"></i><span>Bắt đầu tìm kiếm</span></button>
-              <button id="pauseResumeButton" class="btn btn-outline hidden" style="min-width:140px"><i class="fa-solid fa-pause"></i><span>Tạm dừng</span></button>
-              <div id="spinner" class="flex gap-xs hidden center" style="min-width:140px">
+              <button
+                id="searchButton"
+                type="button"
+                class="btn btn-primary btn-modern"
+                style="flex: 1"
+              >
+                <i class="fa-solid fa-magnifying-glass"></i
+                ><span>Bắt đầu tìm kiếm</span>
+              </button>
+              <button
+                id="pauseResumeButton"
+                class="btn btn-outline hidden"
+                style="min-width: 140px"
+              >
+                <i class="fa-solid fa-pause"></i><span>Tạm dừng</span>
+              </button>
+              <div
+                id="spinner"
+                class="flex gap-xs hidden center"
+                style="min-width: 140px"
+              >
                 <div class="loading-inline"></div>
-                <span class="text-tertiary" style="font-size:.65rem;letter-spacing:.5px;">Đang xử lý...</span>
+                <span
+                  class="text-tertiary"
+                  style="font-size: 0.65rem; letter-spacing: 0.5px"
+                  >Đang xử lý...</span
+                >
               </div>
             </div>
-            <div id="progressContainer" class="hidden" style="margin-top:4px">
+            <div id="progressContainer" class="hidden" style="margin-top: 4px">
               <label for="progressBar" class="visually-hidden">Tiến độ</label>
-              <div class="progress" aria-hidden="true"><div id="progressBar" class="progress-bar"></div></div>
-              <div id="progressText" class="text-tertiary" style="font-size:.6rem;letter-spacing:.45px;margin-top:4px;text-transform:uppercase">0%</div>
+              <div class="progress" aria-hidden="true">
+                <div id="progressBar" class="progress-bar"></div>
+              </div>
+              <div
+                id="progressText"
+                class="text-tertiary"
+                style="
+                  font-size: 0.6rem;
+                  letter-spacing: 0.45px;
+                  margin-top: 4px;
+                  text-transform: uppercase;
+                "
+              >
+                0%
+              </div>
             </div>
           </div>
         </div>
       </section>
-      <section id="panel-results" class="tab-panel" role="tabpanel" tabindex="0" aria-busy="false">
-        <div id="resultsSection" class="glass-card hidden" aria-live="polite" aria-labelledby="resultsTitle">
-          <div class="card-header"><i class="fa-solid fa-table"></i> Kết quả (Live)</div>
-          <div class="flex wrap gap-sm" style="align-items:center; margin-bottom:var(--spacing-sm)">
-            <label for="filterInput" class="text-tertiary" style="margin:0">Lọc</label>
-            <input id="filterInput" type="search" placeholder="Tìm tên khách sạn" style="max-width:260px" />
-            <div class="badge" style="background:rgba(255,255,255,0.1)">Tổng: <span id="resultsCount" style="margin-left:4px">0</span></div>
-            <div class="flex gap-xs" style="margin-left:auto; align-items:center">
-              <label for="pageSizeSelect" class="text-tertiary" style="font-size:.6rem;letter-spacing:.5px;text-transform:uppercase">Page size</label>
-              <select id="pageSizeSelect" style="width:90px">
+      <section
+        id="panel-results"
+        class="tab-panel"
+        role="tabpanel"
+        tabindex="0"
+        aria-busy="false"
+      >
+        <div
+          id="resultsSection"
+          class="glass-card hidden"
+          aria-live="polite"
+          aria-labelledby="resultsTitle"
+        >
+          <div class="card-header">
+            <i class="fa-solid fa-table"></i> Kết quả (Live)
+          </div>
+          <div
+            class="flex wrap gap-sm"
+            style="align-items: center; margin-bottom: var(--spacing-sm)"
+          >
+            <label for="filterInput" class="text-tertiary" style="margin: 0"
+              >Lọc</label
+            >
+            <input
+              id="filterInput"
+              type="search"
+              placeholder="Tìm tên khách sạn"
+              style="max-width: 260px"
+            />
+            <div class="badge" style="background: rgba(255, 255, 255, 0.1)">
+              Tổng: <span id="resultsCount" style="margin-left: 4px">0</span>
+            </div>
+            <div
+              class="flex gap-xs"
+              style="margin-left: auto; align-items: center"
+            >
+              <label
+                for="pageSizeSelect"
+                class="text-tertiary"
+                style="
+                  font-size: 0.6rem;
+                  letter-spacing: 0.5px;
+                  text-transform: uppercase;
+                "
+                >Page size</label
+              >
+              <select id="pageSizeSelect" style="width: 90px">
                 <option value="25">25</option>
                 <option value="50">50</option>
                 <option value="100">100</option>
@@ -90,51 +236,187 @@
               </select>
             </div>
           </div>
-          <div class="table-wrapper" style="max-height:64vh;overflow:auto">
+          <div class="table-wrapper" style="max-height: 64vh; overflow: auto">
             <table id="resultsTable" aria-describedby="resultsTitle">
               <thead>
                 <tr>
-                  <th>Order <span id="orderSortIcon" class="sort-icon" title="Sắp xếp">▲</span></th>
-                  <th>No <span id="noSortIcon" class="sort-icon" title="Sắp xếp">▲</span></th>
-                  <th>% <span id="pctSortIcon" class="sort-icon" title="Sắp xếp">▲</span></th>
-                  <th>Status <span id="statusSortIcon" class="sort-icon" title="Sắp xếp">▲</span></th>
-                  <th>Hotel Name <span id="nameSortIcon" class="sort-icon" title="Sắp xếp">▲</span></th>
+                  <th>
+                    Order
+                    <span id="orderSortIcon" class="sort-icon" title="Sắp xếp"
+                      >▲</span
+                    >
+                  </th>
+                  <th>
+                    No
+                    <span id="noSortIcon" class="sort-icon" title="Sắp xếp"
+                      >▲</span
+                    >
+                  </th>
+                  <th>
+                    %
+                    <span id="pctSortIcon" class="sort-icon" title="Sắp xếp"
+                      >▲</span
+                    >
+                  </th>
+                  <th>
+                    Status
+                    <span id="statusSortIcon" class="sort-icon" title="Sắp xếp"
+                      >▲</span
+                    >
+                  </th>
+                  <th>
+                    Hotel Name
+                    <span id="nameSortIcon" class="sort-icon" title="Sắp xếp"
+                      >▲</span
+                    >
+                  </th>
                   <th>Hotel Address</th>
                   <th>Matched Links</th>
-                  <th>Total Link <span id="linksSortIcon" class="sort-icon" title="Sắp xếp">▲</span></th>
+                  <th>
+                    Total Link
+                    <span id="linksSortIcon" class="sort-icon" title="Sắp xếp"
+                      >▲</span
+                    >
+                  </th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="resultsBody"></tbody>
             </table>
           </div>
-          <div class="flex gap-sm wrap" style="justify-content:flex-end;align-items:center;margin-top:var(--spacing-sm)">
-            <button id="pagePrev" class="btn btn-outline btn-small">« Prev</button>
-            <div id="pageInfo" class="badge" style="background:rgba(255,255,255,0.08)">Trang 1/1</div>
-            <button id="pageNext" class="btn btn-outline btn-small">Next »</button>
+          <div
+            class="flex gap-sm wrap"
+            style="
+              justify-content: flex-end;
+              align-items: center;
+              margin-top: var(--spacing-sm);
+            "
+          >
+            <button id="pagePrev" class="btn btn-outline btn-small">
+              « Prev
+            </button>
+            <div
+              id="pageInfo"
+              class="badge"
+              style="background: rgba(255, 255, 255, 0.08)"
+            >
+              Trang 1/1
+            </div>
+            <button id="pageNext" class="btn btn-outline btn-small">
+              Next »
+            </button>
           </div>
         </div>
       </section>
     </main>
     <div class="toast-container" aria-live="polite" aria-atomic="true"></div>
-    <footer class="app-footer text-tertiary">© <span id="year"></span> Tavily Search Module.</footer>
+    <!-- Confirmation Modal (for clearing results) -->
+    <div
+      id="confirmModal"
+      class="modal-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirmTitle"
+    >
+      <div class="modal" style="max-width: 480px">
+        <h2 id="confirmTitle" class="modal-header">Xác nhận xóa</h2>
+        <p style="margin: 0 0 12px; font-size: 0.85rem; line-height: 1.5">
+          Hành động này sẽ xóa toàn bộ kết quả và phiên đã lưu. Nhập
+          <strong>Đồng Ý Xóa</strong> để xác nhận.
+        </p>
+        <input
+          id="confirmInput"
+          type="text"
+          placeholder="Nhập: Đồng Ý Xóa"
+          style="margin-bottom: 12px"
+        />
+        <div class="modal-actions">
+          <button id="confirmCancel" type="button" class="btn btn-outline">
+            Hủy
+          </button>
+          <button
+            id="confirmOk"
+            type="button"
+            class="btn btn-danger btn-modern"
+          >
+            Xóa
+          </button>
+        </div>
+      </div>
+    </div>
+    <footer class="app-footer text-tertiary">
+      © <span id="year"></span> Tavily Search Module.
+    </footer>
     <script type="module" src="/ui.js"></script>
     <script type="module" src="/hotelSearchTavily.js"></script>
     <script>
-      document.addEventListener('DOMContentLoaded',()=>{
-        document.getElementById('year').textContent = new Date().getFullYear();
-        const stored=localStorage.getItem('theme'); if(stored) document.documentElement.setAttribute('data-theme',stored);
-        const themeBtn=document.getElementById('themeToggle');
-        themeBtn.addEventListener('click',()=>{ const cur=document.documentElement.getAttribute('data-theme'); const next=cur==='dark'?'light':'dark'; document.documentElement.setAttribute('data-theme',next); localStorage.setItem('theme',next); });
-        const resultsSection=document.getElementById('resultsSection');
-        const tabButtons=[...document.querySelectorAll('[role="tab"]')];
-        const resultsTab=tabButtons.find(b=> b.dataset.target==='panel-results');
-        const observer=new MutationObserver(()=>{
-          if(resultsSection && !resultsSection.classList.contains('hidden')){
-            if(resultsTab){ resultsTab.click(); observer.disconnect(); }
+      document.addEventListener("DOMContentLoaded", () => {
+        document.getElementById("year").textContent = new Date().getFullYear();
+        const stored = localStorage.getItem("theme");
+        if (stored) document.documentElement.setAttribute("data-theme", stored);
+        const themeBtn = document.getElementById("themeToggle");
+        themeBtn.addEventListener("click", () => {
+          const cur = document.documentElement.getAttribute("data-theme");
+          const next = cur === "dark" ? "light" : "dark";
+          document.documentElement.setAttribute("data-theme", next);
+          localStorage.setItem("theme", next);
+        });
+        const resultsSection = document.getElementById("resultsSection");
+        const tabButtons = [...document.querySelectorAll('[role="tab"]')];
+        const resultsTab = tabButtons.find(
+          (b) => b.dataset.target === "panel-results"
+        );
+        const observer = new MutationObserver(() => {
+          if (resultsSection && !resultsSection.classList.contains("hidden")) {
+            if (resultsTab) {
+              resultsTab.click();
+              observer.disconnect();
+            }
           }
         });
-        observer.observe(resultsSection,{ attributes:true, attributeFilter:['class']});
+        observer.observe(resultsSection, {
+          attributes: true,
+          attributeFilter: ["class"],
+        });
+
+        // Early bind clear button to show modal when already visible (e.g. after resume)
+        const clearBtnEarly = document.getElementById("clearResultsButton");
+        if (clearBtnEarly) {
+          clearBtnEarly.addEventListener(
+            "click",
+            (ev) => {
+              // If JS main logic already bound a handler it will override; this is a safety net
+              const modal = document.getElementById("confirmModal");
+              if (!modal) return;
+              modal.classList.remove("hidden");
+              modal.style.display = "flex";
+              const input = document.getElementById("confirmInput");
+              const ok = document.getElementById("confirmOk");
+              const cancel = document.getElementById("confirmCancel");
+              if (input) {
+                input.value = "";
+                input.focus();
+              }
+              const closeModal = () => {
+                modal.classList.add("hidden");
+                modal.style.display = "none";
+                if (ok) ok.onclick = null;
+                if (cancel) cancel.onclick = null;
+              };
+              if (cancel) cancel.onclick = closeModal;
+              if (ok)
+                ok.onclick = () => {
+                  if (input && input.value === "Đồng Ý Xóa") {
+                    closeModal();
+                  } else {
+                    alert('Bạn phải nhập đúng "Đồng Ý Xóa"');
+                    if (input) input.focus();
+                  }
+                };
+            },
+            { once: true }
+          );
+        }
       });
     </script>
   </body>
