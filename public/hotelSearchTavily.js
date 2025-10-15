@@ -7,6 +7,273 @@ let fuzzyThreshold = 0.78; // 0 - 1
 let fuzzyWorker = null; // worker instance
 let pendingFuzzyQueue = [];
 let lastFilterQueryRaw = ""; // active search query persisted across rerenders
+const resultDetailState = {
+  currentOrder: null,
+  orders: [],
+  elements: null,
+  ensureVisible: null,
+};
+
+function getResultDetailElements() {
+  if (resultDetailState.elements) return resultDetailState.elements;
+  const modal = document.getElementById("resultDetailModal");
+  if (!modal) return null;
+  resultDetailState.elements = {
+    modal,
+    closeBtn: document.getElementById("resultDetailClose"),
+    closeFooterBtn: document.getElementById("resultDetailCloseFooter"),
+    prevBtn: document.getElementById("resultDetailPrev"),
+    nextBtn: document.getElementById("resultDetailNext"),
+    searchForm: document.getElementById("resultDetailSearchForm"),
+    searchInput: document.getElementById("resultDetailSearchInput"),
+    message: document.getElementById("resultDetailMessage"),
+    order: document.getElementById("resultDetailOrder"),
+    no: document.getElementById("resultDetailNo"),
+    percentage: document.getElementById("resultDetailPercentage"),
+    fuzzy: document.getElementById("resultDetailFuzzy"),
+    status: document.getElementById("resultDetailStatus"),
+    totalLinks: document.getElementById("resultDetailTotalLinks"),
+    hotelName: document.getElementById("resultDetailHotelName"),
+    hotelAddress: document.getElementById("resultDetailHotelAddress"),
+    links: document.getElementById("resultDetailLinks"),
+    openAllBtn: document.getElementById("resultDetailOpenAll"),
+  };
+  return resultDetailState.elements;
+}
+
+function getSortedOrdersAsc() {
+  const results = Array.isArray(window.currentResults)
+    ? window.currentResults
+    : [];
+  const orders = results
+    .map((r) => Number(r?.order))
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
+  return Array.from(new Set(orders));
+}
+
+function getResultByOrder(order) {
+  const results = Array.isArray(window.currentResults)
+    ? window.currentResults
+    : [];
+  const target = results.find((r) => Number(r?.order) === Number(order));
+  return target || null;
+}
+
+function openUrlsWithDelay(urls, delay = 180) {
+  const list = Array.isArray(urls) ? urls : [];
+  const unique = Array.from(
+    new Set(
+      list
+        .map((u) => (typeof u === "string" ? u.trim() : String(u || "").trim()))
+        .filter(Boolean)
+    )
+  );
+  unique.forEach((url, index) => {
+    try {
+      setTimeout(() => window.open(url, "_blank"), index * delay);
+    } catch (e) {
+      console.error("Open link failed", url, e);
+    }
+  });
+}
+
+function closeResultDetailModal() {
+  const els = getResultDetailElements();
+  if (!els || !els.modal) return;
+  els.modal.classList.add("hidden");
+  resultDetailState.currentOrder = null;
+}
+
+function renderResultDetail(result) {
+  const els = getResultDetailElements();
+  if (!els) return;
+  const fmt = (val) => (val == null || val === "" ? "-" : String(val));
+  els.order.textContent = fmt(result?.order);
+  els.no.textContent = fmt(result?.hotelNo);
+  if (result && result.percentage != null && result.percentage !== "") {
+    const pctVal = Number(result.percentage);
+    els.percentage.textContent = Number.isNaN(pctVal)
+      ? String(result.percentage)
+      : `${Math.round(pctVal)}%`;
+  } else {
+    els.percentage.textContent = "-";
+  }
+  els.fuzzy.textContent =
+    result && result.fuzzy != null ? Number(result.fuzzy).toFixed(3) : "-";
+  els.status.textContent = fmt(result?.status);
+  const totalLinks = Array.isArray(result?.matchedLinks)
+    ? result.matchedLinks.length
+    : 0;
+  els.totalLinks.textContent = String(totalLinks);
+  els.hotelName.textContent = fmt(result?.hotelName);
+  els.hotelAddress.textContent = fmt(result?.hotelAddress);
+  const linksContainer = els.links;
+  if (linksContainer) {
+    linksContainer.innerHTML = "";
+    if (totalLinks) {
+      const frag = document.createDocumentFragment();
+      result.matchedLinks.forEach((link) => {
+        const info =
+          typeof link === "string" ? { url: link, percentage: 0 } : link || {};
+        const row = document.createElement("div");
+        row.className = "flex gap-xs wrap";
+        const url = info.url || "";
+        const safeUrl = escapeHtml(url);
+        const hasUrl = !!url;
+        const linkLabel = escapeHtml(shortenUrl(url || ""));
+        row.innerHTML = `
+          ${
+            hasUrl
+              ? `<a href="${safeUrl}" target="_blank" class="link-chip" style="flex:1" title="${safeUrl}">${linkLabel}</a>`
+              : `<span class="text-tertiary" style="flex:1">${
+                  linkLabel || "Không có URL"
+                }</span>`
+          }
+          <span class="text-tertiary" style="font-size:0.65rem">${Math.round(
+            info.percentage || 0
+          )}%</span>`;
+        frag.appendChild(row);
+      });
+      linksContainer.appendChild(frag);
+    } else {
+      const empty = document.createElement("div");
+      empty.className = "text-tertiary";
+      empty.style.fontSize = "0.65rem";
+      empty.textContent = "Không có link phù hợp";
+      linksContainer.appendChild(empty);
+    }
+  }
+  if (els.openAllBtn) {
+    const urls = (result?.matchedLinks || []).map((l) =>
+      typeof l === "string" ? l : l?.url || ""
+    );
+    const unique = Array.from(
+      new Set(urls.map((u) => String(u || "").trim()).filter(Boolean))
+    );
+    els.openAllBtn.disabled = unique.length === 0;
+    els.openAllBtn.dataset.urls = JSON.stringify(unique);
+  }
+}
+
+function navigateResultDetail(delta) {
+  if (!delta) return;
+  const orders = getSortedOrdersAsc();
+  if (!orders.length) return;
+  resultDetailState.orders = orders;
+  const current = Number(resultDetailState.currentOrder);
+  const idx = orders.indexOf(current);
+  const targetIdx =
+    idx === -1 ? (delta > 0 ? 0 : orders.length - 1) : idx + delta;
+  if (targetIdx < 0 || targetIdx >= orders.length) return;
+  openResultDetailModal(orders[targetIdx]);
+}
+
+function handleResultDetailSearch(query) {
+  const els = getResultDetailElements();
+  if (!els) return;
+  const trimmed = (query || "").trim();
+  if (!trimmed) {
+    if (els.message) {
+      els.message.textContent = "Nhập order, No, tên hoặc địa chỉ để tìm.";
+    }
+    return;
+  }
+  const results = Array.isArray(window.currentResults)
+    ? window.currentResults
+    : [];
+  if (!results.length) {
+    if (els.message) {
+      els.message.textContent = "Chưa có dữ liệu kết quả.";
+    }
+    return;
+  }
+  const lowered = trimmed.toLowerCase();
+  const numeric = Number(trimmed);
+  let targetOrder = null;
+  if (Number.isFinite(numeric)) {
+    const byOrder = results.find((r) => Number(r?.order) === numeric);
+    if (byOrder) targetOrder = Number(byOrder.order);
+  }
+  if (targetOrder == null) {
+    const byNo = results.find(
+      (r) =>
+        String(r?.hotelNo || "")
+          .trim()
+          .toLowerCase() === lowered
+    );
+    if (byNo) targetOrder = Number(byNo.order);
+  }
+  if (targetOrder == null) {
+    const byName = results.find((r) =>
+      String(r?.hotelName || "")
+        .toLowerCase()
+        .includes(lowered)
+    );
+    if (byName) targetOrder = Number(byName.order);
+  }
+  if (targetOrder == null) {
+    const byAddress = results.find((r) =>
+      String(r?.hotelAddress || "")
+        .toLowerCase()
+        .includes(lowered)
+    );
+    if (byAddress) targetOrder = Number(byAddress.order);
+  }
+  if (targetOrder == null || !Number.isFinite(targetOrder)) {
+    if (els.message) {
+      els.message.textContent = "Không tìm thấy dòng phù hợp.";
+    }
+    return;
+  }
+  if (els.message) els.message.textContent = "";
+  openResultDetailModal(targetOrder, { scroll: true });
+  if (els.searchInput) {
+    setTimeout(() => {
+      els.searchInput.focus();
+      els.searchInput.select();
+    }, 30);
+  }
+}
+
+function openResultDetailModal(order, opts = {}) {
+  const els = getResultDetailElements();
+  if (!els || !els.modal) return;
+  const targetOrder = Number(order);
+  if (!Number.isFinite(targetOrder)) return;
+  const data = getResultByOrder(targetOrder);
+  if (!data) {
+    if (els.message) {
+      els.message.textContent = `Không tìm thấy dữ liệu cho order ${targetOrder}.`;
+    }
+    if (els.modal) els.modal.classList.remove("hidden");
+    return;
+  }
+  resultDetailState.currentOrder = targetOrder;
+  resultDetailState.orders = getSortedOrdersAsc();
+  if (typeof resultDetailState.ensureVisible === "function") {
+    resultDetailState.ensureVisible(targetOrder, {
+      scroll: opts.scroll !== false,
+    });
+  }
+  if (els.message) els.message.textContent = "";
+  renderResultDetail(data);
+  const idx = resultDetailState.orders.indexOf(targetOrder);
+  if (els.prevBtn) {
+    els.prevBtn.disabled = idx <= 0;
+  }
+  if (els.nextBtn) {
+    els.nextBtn.disabled =
+      idx === -1 || idx >= resultDetailState.orders.length - 1;
+  }
+  els.modal.classList.remove("hidden");
+  if (opts.focusSearch && els.searchInput) {
+    setTimeout(() => {
+      els.searchInput.focus();
+      els.searchInput.select();
+    }, 50);
+  }
+}
 
 // Đảm bảo rằng script chỉ chạy khi DOM đã tải xong
 document.addEventListener("DOMContentLoaded", function () {
@@ -184,6 +451,44 @@ document.addEventListener("DOMContentLoaded", function () {
   let currentSort = "order";
   const counterEl = document.getElementById("counter");
   const resultsSection = document.getElementById("resultsSection");
+  const detailEls = getResultDetailElements();
+  if (detailEls) {
+    if (detailEls.closeBtn)
+      detailEls.closeBtn.addEventListener("click", () =>
+        closeResultDetailModal()
+      );
+    if (detailEls.closeFooterBtn)
+      detailEls.closeFooterBtn.addEventListener("click", () =>
+        closeResultDetailModal()
+      );
+    if (detailEls.modal)
+      detailEls.modal.addEventListener("click", (evt) => {
+        if (evt.target === detailEls.modal) closeResultDetailModal();
+      });
+    if (detailEls.prevBtn)
+      detailEls.prevBtn.addEventListener("click", () =>
+        navigateResultDetail(-1)
+      );
+    if (detailEls.nextBtn)
+      detailEls.nextBtn.addEventListener("click", () =>
+        navigateResultDetail(1)
+      );
+    if (detailEls.openAllBtn)
+      detailEls.openAllBtn.addEventListener("click", () => {
+        let urls = [];
+        try {
+          urls = JSON.parse(detailEls.openAllBtn.dataset.urls || "[]");
+        } catch (e) {
+          urls = [];
+        }
+        openUrlsWithDelay(urls);
+      });
+    if (detailEls.searchForm)
+      detailEls.searchForm.addEventListener("submit", (evt) => {
+        evt.preventDefault();
+        handleResultDetailSearch(detailEls.searchInput?.value || "");
+      });
+  }
   // === Visibility helpers (work with Tailwind-like .hidden utility) ===
   function show(el, display) {
     if (!el) return;
@@ -414,6 +719,35 @@ document.addEventListener("DOMContentLoaded", function () {
     renderResultsPage();
     updatePaginationControls();
   }
+
+  function ensureOrderVisible(order, opts = {}) {
+    const results = window.currentResults || [];
+    const targetOrder = Number(order);
+    if (!Number.isFinite(targetOrder)) return null;
+    const idx = results.findIndex((r) => Number(r?.order) === targetOrder);
+    if (idx === -1) return null;
+    const targetPage = Math.floor(idx / pageSize) + 1;
+    if (targetPage !== currentPage) {
+      goToPage(targetPage);
+    }
+    const body = document.getElementById("resultsBody");
+    if (!body) return null;
+    const rowEl = body.querySelector(`tr[data-order="${targetOrder}"]`);
+    if (!rowEl) return null;
+    const prev = document.querySelector("tr.selected-row");
+    if (prev && prev !== rowEl) prev.classList.remove("selected-row");
+    rowEl.classList.add("selected-row");
+    if (opts.scroll !== false) {
+      try {
+        rowEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch (e) {}
+    }
+    return rowEl;
+  }
+
+  resultDetailState.ensureVisible = ensureOrderVisible;
+  window.showResultDetail = (order, opts) => openResultDetailModal(order, opts);
+  window.closeResultDetailModal = closeResultDetailModal;
 
   function renderResultsPage() {
     const body = document.getElementById("resultsBody");
@@ -1570,6 +1904,10 @@ function downloadCSV(results, filename = "hotel_search_results.csv") {
 
 // --- Live table helpers ---
 function clearResultsTable() {
+  const detailEls = getResultDetailElements();
+  if (detailEls && !detailEls.modal.classList.contains("hidden")) {
+    closeResultDetailModal();
+  }
   const body = document.getElementById("resultsBody");
   if (body) body.innerHTML = "";
   if (lastFilterQueryRaw) {
@@ -1683,17 +2021,8 @@ function appendResultRow(row, options = {}) {
       openAllBtn.title = `Mở tất cả ${uniqueUrls.length} liên kết`;
       openAllBtn.removeAttribute("aria-hidden");
     }
-    // Open all links: staggered to reduce popup blocking
     openAllBtn.addEventListener("click", () => {
-      if (!uniqueUrls.length) return;
-      const delay = 180; // ms between opens
-      uniqueUrls.forEach((u, i) => {
-        try {
-          setTimeout(() => window.open(u, "_blank"), i * delay);
-        } catch (e) {
-          console.error("Open all failed for", u, e);
-        }
-      });
+      openUrlsWithDelay(uniqueUrls);
     });
   }
   // Note: per-row inline "Sao chép" has been removed; per-link copy is available in the ⋯ menu
@@ -1704,11 +2033,16 @@ function appendResultRow(row, options = {}) {
   // make row focusable and selectable for keyboard shortcuts
   tr.tabIndex = 0;
   tr.style.cursor = "pointer";
-  tr.addEventListener("click", () => {
-    // remove previous selection
+  tr.addEventListener("click", (evt) => {
     const prev = document.querySelector("tr.selected-row");
     if (prev && prev !== tr) prev.classList.remove("selected-row");
     tr.classList.add("selected-row");
+    const interactiveTarget = evt.target.closest("button, a");
+    const inCopyCell = evt.target.closest("td.copy-hotel");
+    if (interactiveTarget || inCopyCell) return;
+    if (typeof window.showResultDetail === "function") {
+      window.showResultDetail(row?.order, { scroll: false });
+    }
   });
 
   // add expandable detail row immediately after
@@ -2009,6 +2343,28 @@ function normalizeToken(s) {
 
 // Global keyboard shortcuts
 document.addEventListener("keydown", (e) => {
+  const detailEls = resultDetailState.elements;
+  const modalOpen =
+    detailEls &&
+    detailEls.modal &&
+    !detailEls.modal.classList.contains("hidden");
+  if (modalOpen) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeResultDetailModal();
+      return;
+    }
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      navigateResultDetail(1);
+      return;
+    }
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      navigateResultDetail(-1);
+      return;
+    }
+  }
   // Alt+S: focus the filter input (#filterInput). If missing, fallback to starting the search.
   if (e.altKey && (e.key === "s" || e.key === "S")) {
     const filterEl = document.getElementById("filterInput");

@@ -411,6 +411,136 @@
           </div>
         </div>
       </div>
+      <!-- Modal: Result Detail -->
+      <div
+        id="resultDetailModal"
+        class="modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="resultDetailTitle"
+      >
+        <div class="modal-content glass-card" style="max-width: 720px">
+          <div class="modal-header">
+            <h3 id="resultDetailTitle" style="margin: 0; font-size: 1rem">
+              <i class="fa-solid fa-table-list"></i> Chi tiết kết quả
+            </h3>
+            <button
+              class="btn btn-sm btn-outline"
+              id="resultDetailClose"
+              aria-label="Đóng"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div
+            class="modal-body stack-sm"
+            style="max-height: 65vh; overflow: auto; font-size: 0.72rem"
+          >
+            <form
+              id="resultDetailSearchForm"
+              class="flex gap-xs wrap"
+              style="align-items: center"
+            >
+              <input
+                id="resultDetailSearchInput"
+                type="text"
+                placeholder="Nhập Order / No / Tên khách sạn / Địa chỉ..."
+                class="input"
+                style="flex: 1; font-size: 0.7rem; padding: 4px 8px"
+                autocomplete="off"
+              />
+              <button type="submit" class="btn btn-outline btn-small">
+                <i class="fa-solid fa-search"></i><span>Tìm</span>
+              </button>
+            </form>
+            <div
+              id="resultDetailMessage"
+              class="text-tertiary"
+              style="font-size: 0.65rem; min-height: 18px"
+            ></div>
+            <div
+              class="detail-grid"
+              style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                gap: 8px;
+                font-size: 0.7rem;
+              "
+            >
+              <div>
+                <strong>Order:</strong> <span id="resultDetailOrder">-</span>
+              </div>
+              <div><strong>No:</strong> <span id="resultDetailNo">-</span></div>
+              <div>
+                <strong>%:</strong>
+                <span id="resultDetailPercentage">-</span>
+              </div>
+              <div>
+                <strong>Fuzzy:</strong> <span id="resultDetailFuzzy">-</span>
+              </div>
+              <div>
+                <strong>Trạng thái:</strong>
+                <span id="resultDetailStatus">-</span>
+              </div>
+              <div>
+                <strong>Tổng link:</strong>
+                <span id="resultDetailTotalLinks">0</span>
+              </div>
+            </div>
+            <div class="stack-xs">
+              <div>
+                <strong>Tên khách sạn</strong>
+                <div id="resultDetailHotelName" style="margin-top: 2px"></div>
+              </div>
+              <div>
+                <strong>Địa chỉ</strong>
+                <div
+                  id="resultDetailHotelAddress"
+                  style="margin-top: 2px"
+                ></div>
+              </div>
+            </div>
+            <div class="stack-xs">
+              <div class="flex gap-xs wrap" style="align-items: center">
+                <strong style="font-size: 0.7rem">Matched links</strong>
+                <button
+                  type="button"
+                  id="resultDetailOpenAll"
+                  class="btn btn-outline btn-small"
+                >
+                  <i class="fa-solid fa-up-right-from-square"></i
+                  ><span>Mở tất cả</span>
+                </button>
+              </div>
+              <div id="resultDetailLinks" class="stack-xs"></div>
+            </div>
+          </div>
+          <div class="modal-footer flex gap-sm wrap">
+            <button
+              id="resultDetailPrev"
+              class="btn btn-outline btn-small"
+              type="button"
+            >
+              <i class="fa-solid fa-angle-left"></i><span>Previous</span>
+            </button>
+            <button
+              id="resultDetailNext"
+              class="btn btn-outline btn-small"
+              type="button"
+            >
+              <span>Next</span><i class="fa-solid fa-angle-right"></i>
+            </button>
+            <div style="flex: 1"></div>
+            <button
+              id="resultDetailCloseFooter"
+              class="btn btn-outline btn-small"
+              type="button"
+            >
+              <i class="fa-solid fa-xmark"></i><span>Đóng</span>
+            </button>
+          </div>
+        </div>
+      </div>
       <section
         id="panel-results"
         class="tab-panel"
