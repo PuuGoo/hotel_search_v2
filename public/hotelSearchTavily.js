@@ -6,6 +6,7 @@ let fuzzyEnabled = false; // persisted via localStorage tavily_fuzzy_cfg
 let fuzzyThreshold = 0.78; // 0 - 1
 let fuzzyWorker = null; // worker instance
 let pendingFuzzyQueue = [];
+let lastFilterQueryRaw = ""; // active search query persisted across rerenders
 
 // Đảm bảo rằng script chỉ chạy khi DOM đã tải xong
 document.addEventListener("DOMContentLoaded", function () {
@@ -415,7 +416,17 @@ document.addEventListener("DOMContentLoaded", function () {
     const pageRows = results.slice(start, start + pageSize);
     for (const r of pageRows) {
       // reuse appendResultRow but it appends directly; instead create a temporary container
-      appendResultRow(r);
+      appendResultRow(r, {
+        skipFilterRefresh: true,
+      });
+    }
+    if (lastFilterQueryRaw) {
+      applyFilterToResults(lastFilterQueryRaw, {
+        preserveSelection: true,
+        scrollToFirst: false,
+      });
+    } else {
+      updateResultsCountDisplay();
     }
   }
 
@@ -1562,6 +1573,25 @@ function downloadCSV(results, filename = "hotel_search_results.csv") {
 function clearResultsTable() {
   const body = document.getElementById("resultsBody");
   if (body) body.innerHTML = "";
+  if (lastFilterQueryRaw) {
+    applyFilterToResults(lastFilterQueryRaw, {
+      scrollToFirst: false,
+      preserveSelection: true,
+    });
+  } else {
+    updateResultsCountDisplay();
+  }
+}
+
+function updateResultsCountDisplay() {
+  if (lastFilterQueryRaw && lastFilterQueryRaw.trim() !== "") return;
+  const body = document.getElementById("resultsBody");
+  const resultsCountEl = document.getElementById("resultsCount");
+  if (!body || !resultsCountEl) return;
+  const total = Array.from(body.children).filter(
+    (r) => !r.classList.contains("detail-row")
+  ).length;
+  resultsCountEl.textContent = String(total);
 }
 
 function escapeHtml(str) {
@@ -1575,7 +1605,12 @@ function escapeHtml(str) {
 }
 
 function appendResultRow(row, options = {}) {
-  const { prepend = false } = options;
+  const {
+    prepend = false,
+    skipFilterRefresh = false,
+    preserveSelection = true,
+    scrollToFirst = false,
+  } = options;
   const body = document.getElementById("resultsBody");
   if (!body) return;
 
@@ -1716,12 +1751,17 @@ function appendResultRow(row, options = {}) {
 
   // per-row menu removed: individual link actions are not shown inline
 
-  // update results count (count only main rows)
-  const resultsCountEl = document.getElementById("resultsCount");
-  if (resultsCountEl)
-    resultsCountEl.textContent = Array.from(body.children).filter(
-      (r) => !r.classList.contains("detail-row")
-    ).length;
+  // refresh filter view or counts so streaming respects current query
+  if (!skipFilterRefresh) {
+    if (lastFilterQueryRaw) {
+      applyFilterToResults(lastFilterQueryRaw, {
+        preserveSelection,
+        scrollToFirst,
+      });
+    } else {
+      updateResultsCountDisplay();
+    }
+  }
 
   // keep filter input focused so keyboard shortcuts and typing work while results stream in
   try {
@@ -1819,6 +1859,90 @@ function appendResultRow(row, options = {}) {
   return { row: tr, detailRow: detailTr };
 }
 
+function applyFilterToResults(rawQuery, opts = {}) {
+  const body = document.getElementById("resultsBody");
+  const resultsCountEl = document.getElementById("resultsCount");
+  lastFilterQueryRaw = rawQuery != null ? String(rawQuery) : "";
+  if (!body) return;
+
+  const query = lastFilterQueryRaw.trim().toLowerCase();
+  const preserveSelection = !!opts.preserveSelection;
+  const shouldScroll = opts.scrollToFirst !== false;
+  const rows = Array.from(body.children);
+  const currentlySelected = document.querySelector("tr.selected-row");
+  const selectionStillVisible =
+    preserveSelection &&
+    currentlySelected &&
+    body.contains(currentlySelected) &&
+    currentlySelected.style.display !== "none";
+
+  let visible = 0;
+  let firstVisible = null;
+
+  for (let i = 0; i < rows.length; i++) {
+    const tr = rows[i];
+    if (!tr || tr.nodeType !== 1) continue;
+
+    if (tr.classList.contains("detail-row")) {
+      // detail rows mirror their parent row's visibility
+      continue;
+    }
+
+    const detailRow = rows[i + 1];
+    const nameTd = tr.querySelector('td[data-field="hotelName"]');
+    const addressTd = tr.querySelector('td[data-field="hotelAddress"]');
+    const name = nameTd ? nameTd.textContent.trim().toLowerCase() : "";
+    const address = addressTd ? addressTd.textContent.trim().toLowerCase() : "";
+    const match = !query || name.includes(query) || address.includes(query);
+
+    if (match) {
+      tr.style.display = "";
+      if (detailRow && detailRow.classList.contains("detail-row")) {
+        detailRow.style.display =
+          detailRow.dataset.open === "true" ? "" : "none";
+      }
+      if (!firstVisible) firstVisible = tr;
+      visible++;
+    } else {
+      tr.style.display = "none";
+      if (detailRow && detailRow.classList.contains("detail-row")) {
+        detailRow.style.display = "none";
+      }
+      if (tr.classList.contains("selected-row")) {
+        tr.classList.remove("selected-row");
+      }
+    }
+  }
+
+  if (query) {
+    if (resultsCountEl) resultsCountEl.textContent = String(visible);
+  } else {
+    updateResultsCountDisplay();
+  }
+
+  if (!firstVisible) {
+    if (!query && currentlySelected) {
+      currentlySelected.classList.remove("selected-row");
+    }
+    return;
+  }
+
+  if (selectionStillVisible) {
+    return;
+  }
+
+  if (currentlySelected && currentlySelected !== firstVisible) {
+    currentlySelected.classList.remove("selected-row");
+  }
+
+  firstVisible.classList.add("selected-row");
+  if (shouldScroll) {
+    try {
+      firstVisible.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (e) {}
+  }
+}
+
 function shortenUrl(url) {
   try {
     const u = new URL(url);
@@ -1836,62 +1960,16 @@ function shortenUrl(url) {
 const filterInput = document.getElementById("filterInput");
 if (filterInput) {
   filterInput.addEventListener("input", (e) => {
-    const q = e.target.value.trim().toLowerCase();
-    const body = document.getElementById("resultsBody");
-    if (!body) return;
-    let visible = 0;
-    const rows = Array.from(body.children);
-    for (let i = 0; i < rows.length; i++) {
-      const tr = rows[i];
-      if (tr.classList && tr.classList.contains("detail-row")) {
-        tr.style.display = "none";
-        continue;
-      }
-
-      const nameTd = tr.querySelector('td[data-field="hotelName"]');
-      const addressTd = tr.querySelector('td[data-field="hotelAddress"]');
-      const name = nameTd ? nameTd.textContent.trim().toLowerCase() : "";
-      const address = addressTd
-        ? addressTd.textContent.trim().toLowerCase()
-        : "";
-      const match = !q || name.includes(q) || address.includes(q);
-      const detailRow = rows[i + 1];
-
-      if (match) {
-        tr.style.display = "";
-        if (
-          detailRow &&
-          detailRow.classList &&
-          detailRow.classList.contains("detail-row")
-        ) {
-          detailRow.style.display =
-            detailRow.dataset.open === "true" ? "" : "none";
-        }
-        if (visible === 0) {
-          const prev = document.querySelector("tr.selected-row");
-          if (prev) prev.classList.remove("selected-row");
-          tr.classList.add("selected-row");
-          try {
-            tr.scrollIntoView({ behavior: "smooth", block: "center" });
-          } catch (e) {}
-        }
-        visible++;
-      } else {
-        tr.style.display = "none";
-        if (
-          detailRow &&
-          detailRow.classList &&
-          detailRow.classList.contains("detail-row")
-        ) {
-          detailRow.style.display = "none";
-        }
-        if (tr.classList && tr.classList.contains("selected-row"))
-          tr.classList.remove("selected-row");
-      }
-    }
-    const resultsCountEl = document.getElementById("resultsCount");
-    if (resultsCountEl) resultsCountEl.textContent = visible;
+    applyFilterToResults(e.target.value || "", {
+      preserveSelection: false,
+    });
   });
+  if (filterInput.value) {
+    applyFilterToResults(filterInput.value, {
+      preserveSelection: false,
+      scrollToFirst: false,
+    });
+  }
 }
 
 // Hàm kiểm tra tên khách sạn có nằm trong tiêu đề trang hay không
