@@ -707,10 +707,12 @@
           if (dropZone) dropZone.classList.add("has-file");
         }
         if (browseBtn) {
-          browseBtn.addEventListener(
-            "click",
-            () => fileInputModern && fileInputModern.click()
-          );
+          browseBtn.addEventListener("click", (e) => {
+            // Prevent bubbling to dropZone which would trigger a second .click()
+            e.preventDefault();
+            e.stopPropagation();
+            if (fileInputModern) fileInputModern.click();
+          });
         }
         if (dropZone) {
           ["dragenter", "dragover"].forEach((evt) =>
@@ -734,6 +736,15 @@
             }
           });
           dropZone.addEventListener("click", (e) => {
+            // If the click originated from the browse button, ignore here to avoid double opening
+            const target = e.target;
+            if (
+              target &&
+              typeof target.closest === "function" &&
+              target.closest("#browseFileBtn")
+            ) {
+              return;
+            }
             if (fileInputModern) fileInputModern.click();
           });
         }
