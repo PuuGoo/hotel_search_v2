@@ -259,6 +259,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       // Always clear shouldStop at the beginning of a brand new run
       shouldStop = false;
+      ensureNewestFirstOrdering();
       const searchBtn = document.getElementById("searchButton");
       const spinnerEl = document.getElementById("spinner");
       const downloadBtn = document.getElementById("downloadCSVButton");
@@ -341,7 +342,7 @@ document.addEventListener("DOMContentLoaded", function () {
               window.currentResults = saved.results || [];
               showResultsSection();
               clearResultsTable();
-              (window.currentResults || []).forEach((r) => appendResultRow(r));
+              sortTable(currentSort, false);
               // restore runCount from saved results length
               runCount =
                 saved.results && saved.results.length
@@ -451,7 +452,11 @@ document.addEventListener("DOMContentLoaded", function () {
       show(pauseBtnEl, "inline-flex");
       pauseBtnEl.textContent = "Tạm dừng";
     }
-    let order = results.length ? results[results.length - 1].order + 1 : 1;
+    const existingMaxOrder = results.reduce((max, r) => {
+      const value = typeof r?.order === "number" ? r.order : Number(r?.order);
+      return Number.isFinite(value) && value > max ? value : max;
+    }, 0);
+    let order = existingMaxOrder + 1;
     let currentIndex = results.length || 0;
     MAX_RUNS = jsonData.length;
     updateCounter(counterEl, runCount, MAX_RUNS);
@@ -575,6 +580,7 @@ document.addEventListener("DOMContentLoaded", function () {
         status: statusLabel,
         fuzzy: null,
       });
+      const newRowOrder = results[results.length - 1]?.order;
       window.currentResults = results;
       // sort lại theo trạng thái hiện tại
       sortTable(currentSort, false);
@@ -595,42 +601,43 @@ document.addEventListener("DOMContentLoaded", function () {
       runCount++;
       localStorage.setItem("runCount", runCount);
       updateCounter(counterEl, runCount, MAX_RUNS);
-      // Append to DOM only if the new row is within the current page range
-      const newIndex = results.length - 1; // 0-based in results
-      const start = (currentPage - 1) * pageSize;
-      const end = start + pageSize - 1;
-      if (newIndex >= start && newIndex <= end) {
-        const newRowObj = results[results.length - 1];
-        appendResultRow(newRowObj);
-        if (fuzzyEnabled && fuzzyWorker) {
-          try {
-            const lastTr =
-              document.getElementById("resultsBody")?.lastElementChild
-                ?.previousElementSibling || null;
-            const candidates = (newRowObj.matchedLinks || []).map((l) => ({
-              title: l.title || l.url,
-              url: l.url,
-            }));
-            if (!candidates.length) {
-              if (lastTr) {
-                const c = lastTr.querySelector('[data-col="fuzzy"]');
-                if (c) c.textContent = "-";
-              }
-            } else {
-              pendingFuzzyQueue.push({
-                rowRef: lastTr,
-                resultObj: newRowObj,
-                expected: candidates.length,
-                candidates, // store for console logging
-              });
-              fuzzyWorker.postMessage({
-                type: "score",
-                query: newRowObj.hotelName || "",
-                candidates,
-                opts: { titleOnly: true },
-              });
+      if (typeof newRowOrder === "number") {
+        const newIndex = results.findIndex((r) => r.order === newRowOrder);
+        if (newIndex !== -1) {
+          const startIndex = (currentPage - 1) * pageSize;
+          const endIndex = startIndex + pageSize - 1;
+          if (newIndex >= startIndex && newIndex <= endIndex) {
+            const body = document.getElementById("resultsBody");
+            const rowEl = body
+              ? body.querySelector(`tr[data-order="${newRowOrder}"]`)
+              : null;
+            const newRowObj = results[newIndex];
+            if (rowEl && fuzzyEnabled && fuzzyWorker) {
+              try {
+                const candidates = (newRowObj.matchedLinks || []).map((l) => ({
+                  title: l.title || l.url,
+                  url: l.url,
+                }));
+                if (!candidates.length) {
+                  const c = rowEl.querySelector('[data-col="fuzzy"]');
+                  if (c) c.textContent = "-";
+                } else {
+                  pendingFuzzyQueue.push({
+                    rowRef: rowEl,
+                    resultObj: newRowObj,
+                    expected: candidates.length,
+                    candidates,
+                  });
+                  fuzzyWorker.postMessage({
+                    type: "score",
+                    query: newRowObj.hotelName || "",
+                    candidates,
+                    opts: { titleOnly: true },
+                  });
+                }
+              } catch (e) {}
             }
-          } catch (e) {}
+          }
         }
       }
       currentIndex++;
@@ -747,9 +754,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         updateCounter(counterEl, runCount, MAX_RUNS);
                         showResultsSection();
                         clearResultsTable();
-                        window.currentResults.forEach((r) =>
-                          appendResultRow(r)
-                        );
+                        sortTable(currentSort, false);
                         const undoInline = document.getElementById(
                           "undoInlineContainer"
                         );
@@ -783,7 +788,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     updateCounter(counterEl, runCount, MAX_RUNS);
                     showResultsSection();
                     clearResultsTable();
-                    window.currentResults.forEach((r) => appendResultRow(r));
+                    sortTable(currentSort, false);
                     undoInline.innerHTML = "";
                     hide(undoInline);
                   });
@@ -875,9 +880,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   updateCounter(counterEl, runCount, MAX_RUNS);
                   showResultsSection();
                   clearResultsTable();
-                  (window.currentResults || []).forEach((r) =>
-                    appendResultRow(r)
-                  );
+                  sortTable(currentSort, false);
                 } catch (e) {}
               },
             },
@@ -905,7 +908,7 @@ document.addEventListener("DOMContentLoaded", function () {
               updateCounter(counterEl, runCount, MAX_RUNS);
               showResultsSection();
               clearResultsTable();
-              (window.currentResults || []).forEach((r) => appendResultRow(r));
+              sortTable(currentSort, false);
               undoInline.innerHTML = "";
               hide(undoInline);
             } catch (e) {}
@@ -1005,7 +1008,7 @@ document.addEventListener("DOMContentLoaded", function () {
       // restore previous results into window and table
       window.currentResults = saved.results || [];
       clearResultsTable();
-      (window.currentResults || []).forEach((r) => appendResultRow(r));
+      sortTable(currentSort, false);
       runCount =
         saved.results && saved.results.length ? saved.results.length : runCount;
       MAX_RUNS = saved.maxRuns || (saved.allRows && saved.allRows.length) || 0;
@@ -1198,7 +1201,7 @@ document.addEventListener("DOMContentLoaded", function () {
           updateCounter(counterEl, runCount, MAX_RUNS);
           showResultsSection();
           clearResultsTable();
-          window.currentResults.forEach((r) => appendResultRow(r));
+          sortTable(currentSort, false);
           if (Toasts)
             Toasts.show("Đã khôi phục snapshot", {
               type: "success",
@@ -1244,7 +1247,7 @@ document.addEventListener("DOMContentLoaded", function () {
             updateCounter(counterEl, runCount, MAX_RUNS);
             showResultsSection();
             clearResultsTable();
-            window.currentResults.forEach((r) => appendResultRow(r));
+            sortTable(currentSort, false);
             // show progress bar early
             const progressContainer =
               document.getElementById("progressContainer");
@@ -1325,13 +1328,19 @@ document.addEventListener("DOMContentLoaded", function () {
   })();
 
   // Biến lưu trạng thái sort cho từng cột
-  let orderSortAsc = true;
+  let orderSortAsc = false;
   let noSortAsc = true;
   let pctSortAsc = true;
   let statusSortAsc = true;
   let nameSortAsc = true;
   let linksSortAsc = true;
   let currentSort = "order";
+
+  function ensureNewestFirstOrdering() {
+    currentSort = "order";
+    orderSortAsc = false;
+    sortTable("order", false);
+  }
 
   // Hàm sort cho từng cột
   function sortTable(col, toggle = true) {
@@ -1565,11 +1574,15 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
-function appendResultRow(row) {
+function appendResultRow(row, options = {}) {
+  const { prepend = false } = options;
   const body = document.getElementById("resultsBody");
   if (!body) return;
 
   const tr = document.createElement("tr");
+  if (row && row.order != null) {
+    tr.dataset.order = String(row.order);
+  }
   const links = (row.matchedLinks || []).map((l) =>
     typeof l === "string" ? { url: l, percentage: 0 } : l
   );
@@ -1604,15 +1617,11 @@ function appendResultRow(row) {
     status === "Matched" ? "#0b7a53" : "#a33"
   };font-weight:600">${escapeHtml(status)}</span></td>
     <td class="copy-hotel" data-field="hotelName" title="${escapeHtml(
-    row.hotelName
-  )}">${escapeHtml(
-    row.hotelName
-  )}</td>
+      row.hotelName
+    )}">${escapeHtml(row.hotelName)}</td>
     <td class="copy-hotel" data-field="hotelAddress" title="${escapeHtml(
-    row.hotelAddress
-  )}">${escapeHtml(
-    row.hotelAddress
-  )}</td>
+      row.hotelAddress
+    )}">${escapeHtml(row.hotelAddress)}</td>
     <td class="matched-cell">${linksHtml}</td>
     <td>${matchedLinksCount}</td>
     <td>
@@ -1655,7 +1664,8 @@ function appendResultRow(row) {
   }
   // Note: per-row inline "Sao chép" has been removed; per-link copy is available in the ⋯ menu
 
-  body.appendChild(tr);
+  const insertBeforeNode = prepend ? body.firstChild : null;
+  body.insertBefore(tr, insertBeforeNode);
 
   // make row focusable and selectable for keyboard shortcuts
   tr.tabIndex = 0;
@@ -1672,6 +1682,8 @@ function appendResultRow(row) {
   detailTr.className = "detail-row";
   detailTr.style.display = "none";
   detailTr.dataset.open = "false";
+  if (row && row.order != null)
+    detailTr.dataset.parentOrder = String(row.order);
   detailTr.innerHTML = `<td colspan="8" style="background:#fbffff;padding:10px">${links
     .map(
       (l) =>
@@ -1684,7 +1696,7 @@ function appendResultRow(row) {
         )}%</small></div>`
     )
     .join("")}</td>`;
-  body.appendChild(detailTr);
+  body.insertBefore(detailTr, insertBeforeNode);
 
   // wire toggle to show/hide detail tr
   const toggleBtn = tr.querySelector('button[data-action="toggle"]');
@@ -1803,6 +1815,8 @@ function appendResultRow(row) {
     if (nameCell) nameCell.addEventListener("dblclick", copyBoth);
     if (addressCell) addressCell.addEventListener("dblclick", copyBoth);
   })();
+
+  return { row: tr, detailRow: detailTr };
 }
 
 function shortenUrl(url) {
