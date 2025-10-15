@@ -1603,10 +1603,14 @@ function appendResultRow(row) {
     };color:${
     status === "Matched" ? "#0b7a53" : "#a33"
   };font-weight:600">${escapeHtml(status)}</span></td>
-    <td class="copy-hotel" title="${escapeHtml(row.hotelName)}">${escapeHtml(
+    <td class="copy-hotel" data-field="hotelName" title="${escapeHtml(
+    row.hotelName
+  )}">${escapeHtml(
     row.hotelName
   )}</td>
-    <td class="copy-hotel" title="${escapeHtml(row.hotelAddress)}">${escapeHtml(
+    <td class="copy-hotel" data-field="hotelAddress" title="${escapeHtml(
+    row.hotelAddress
+  )}">${escapeHtml(
     row.hotelAddress
   )}</td>
     <td class="matched-cell">${linksHtml}</td>
@@ -1667,6 +1671,7 @@ function appendResultRow(row) {
   const detailTr = document.createElement("tr");
   detailTr.className = "detail-row";
   detailTr.style.display = "none";
+  detailTr.dataset.open = "false";
   detailTr.innerHTML = `<td colspan="8" style="background:#fbffff;padding:10px">${links
     .map(
       (l) =>
@@ -1687,9 +1692,11 @@ function appendResultRow(row) {
     toggleBtn.addEventListener("click", () => {
       if (detailTr.style.display === "none") {
         detailTr.style.display = "";
+        detailTr.dataset.open = "true";
         toggleBtn.textContent = "Ẩn";
       } else {
         detailTr.style.display = "none";
+        detailTr.dataset.open = "false";
         toggleBtn.textContent = "Xem";
       }
     });
@@ -1822,22 +1829,31 @@ if (filterInput) {
     const rows = Array.from(body.children);
     for (let i = 0; i < rows.length; i++) {
       const tr = rows[i];
-      // skip detail rows
       if (tr.classList && tr.classList.contains("detail-row")) {
         tr.style.display = "none";
         continue;
       }
-      const nameTd = tr.children[4];
+
+      const nameTd = tr.querySelector('td[data-field="hotelName"]');
+      const addressTd = tr.querySelector('td[data-field="hotelAddress"]');
       const name = nameTd ? nameTd.textContent.trim().toLowerCase() : "";
-      if (!q || name.includes(q)) {
-        tr.style.display = ""; // show detail row as well
-        const next = rows[i + 1];
-        if (next && next.classList && next.classList.contains("detail-row")) {
-          next.style.display = "";
+      const address = addressTd
+        ? addressTd.textContent.trim().toLowerCase()
+        : "";
+      const match = !q || name.includes(q) || address.includes(q);
+      const detailRow = rows[i + 1];
+
+      if (match) {
+        tr.style.display = "";
+        if (
+          detailRow &&
+          detailRow.classList &&
+          detailRow.classList.contains("detail-row")
+        ) {
+          detailRow.style.display =
+            detailRow.dataset.open === "true" ? "" : "none";
         }
-        // if this is the first visible match, select it and scroll into view
         if (visible === 0) {
-          // remove previous selection
           const prev = document.querySelector("tr.selected-row");
           if (prev) prev.classList.remove("selected-row");
           tr.classList.add("selected-row");
@@ -1848,10 +1864,13 @@ if (filterInput) {
         visible++;
       } else {
         tr.style.display = "none";
-        const next = rows[i + 1];
-        if (next && next.classList && next.classList.contains("detail-row"))
-          next.style.display = "none";
-        // if this row was selected previously, remove selection
+        if (
+          detailRow &&
+          detailRow.classList &&
+          detailRow.classList.contains("detail-row")
+        ) {
+          detailRow.style.display = "none";
+        }
         if (tr.classList && tr.classList.contains("selected-row"))
           tr.classList.remove("selected-row");
       }
