@@ -74,7 +74,7 @@ async function connectToDatabase() {
   }
 }
 
-await connectToDatabase(); // Gọi hàm kết nối đến cơ sở dữ liệu
+// await connectToDatabase(); // Gọi hàm kết nối đến cơ sở dữ liệu
 
 // Middleware to check if the user is logged in
 function checkAuthenticated(req, res, next) {
