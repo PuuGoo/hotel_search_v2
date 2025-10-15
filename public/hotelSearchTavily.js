@@ -174,6 +174,14 @@ document.addEventListener("DOMContentLoaded", function () {
   let pageSize = parseInt(localStorage.getItem("tavily_pageSize") || "2000");
   if (!PAGE_SIZES.includes(pageSize)) pageSize = 2000;
   let currentPage = 1; // 1-based
+  // Sort state – declared early so resume logic can access without TDZ issues
+  let orderSortAsc = false;
+  let noSortAsc = true;
+  let pctSortAsc = true;
+  let statusSortAsc = true;
+  let nameSortAsc = true;
+  let linksSortAsc = true;
+  let currentSort = "order";
   const counterEl = document.getElementById("counter");
   const resultsSection = document.getElementById("resultsSection");
   // === Visibility helpers (work with Tailwind-like .hidden utility) ===
@@ -1337,15 +1345,6 @@ document.addEventListener("DOMContentLoaded", function () {
         );
       });
   })();
-
-  // Biến lưu trạng thái sort cho từng cột
-  let orderSortAsc = false;
-  let noSortAsc = true;
-  let pctSortAsc = true;
-  let statusSortAsc = true;
-  let nameSortAsc = true;
-  let linksSortAsc = true;
-  let currentSort = "order";
 
   function ensureNewestFirstOrdering() {
     currentSort = "order";
