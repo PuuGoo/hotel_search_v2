@@ -438,6 +438,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
   // Pagination settings
   const PAGE_SIZES = [50, 100, 200, 500, 1000, 2000];
+  const IMPORT_SNAPSHOT_LABEL = "Import CSV";
   let pageSize = parseInt(localStorage.getItem("tavily_pageSize") || "2000");
   if (!PAGE_SIZES.includes(pageSize)) pageSize = 2000;
   let currentPage = 1; // 1-based
@@ -450,6 +451,8 @@ document.addEventListener("DOMContentLoaded", function () {
   let linksSortAsc = true;
   let currentSort = "order";
   const counterEl = document.getElementById("counter");
+  const importButtonEl = document.getElementById("importCSVButton");
+  const importInputEl = document.getElementById("importCSVInput");
   const resultsSection = document.getElementById("resultsSection");
   const detailEls = getResultDetailElements();
   if (detailEls) {
@@ -538,6 +541,404 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
   }
+
+  function enableClearButton(snapshotLabel = "Clear") {
+    const clearBtnEl = document.getElementById("clearResultsButton");
+    const downloadBtnEl = document.getElementById("downloadCSVButton");
+    if (!clearBtnEl) return;
+    show(clearBtnEl, "inline-flex");
+    clearBtnEl.onclick = (ev) => {
+      if (ev) {
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+      }
+      const modal = document.getElementById("confirmModal");
+      const input = document.getElementById("confirmInput");
+      const ok = document.getElementById("confirmOk");
+      const cancel = document.getElementById("confirmCancel");
+      if (!modal || !input || !ok || !cancel) return;
+      input.value = "";
+      show(modal, "flex");
+      input.focus();
+      const cleanup = () => {
+        hide(modal);
+        ok.onclick = null;
+        cancel.onclick = null;
+      };
+      cancel.onclick = () => {
+        cleanup();
+      };
+      ok.onclick = () => {
+        if (input.value === "Đồng Ý Xóa") {
+          window.__lastClearedSnapshot = {
+            results: (window.currentResults || []).slice(),
+            runCountSnapshot: runCount,
+            maxRunsSnapshot: MAX_RUNS,
+          };
+          let allRowsForSnap = null;
+          try {
+            const sess = JSON.parse(
+              localStorage.getItem("tavily_session") || "null"
+            );
+            if (sess && Array.isArray(sess.allRows))
+              allRowsForSnap = sess.allRows;
+          } catch (e) {}
+          addSnapshot(snapshotLabel, {
+            results: window.__lastClearedSnapshot.results,
+            runCount: runCount,
+            maxRuns: MAX_RUNS,
+            allRows: allRowsForSnap,
+          });
+          clearResultsTable();
+          window.currentResults = [];
+          hideResultsSection();
+          hide(clearBtnEl);
+          hide(downloadBtnEl);
+          try {
+            localStorage.removeItem("tavily_session");
+            localStorage.removeItem("runCount");
+            runCount = 0;
+            updateCounter(counterEl, 0, 0);
+            const resumeBtn = document.getElementById(
+              "resumeSessionButton"
+            );
+            hide(resumeBtn);
+          } catch (e) {}
+          cleanup();
+          if (Toasts) {
+            Toasts.show("Đã xóa kết quả", {
+              type: "success",
+              title: "Xóa",
+              actions: [
+                {
+                  label: "Hoàn tác",
+                  onClick: () => {
+                    const snap = window.__lastClearedSnapshot;
+                    if (!snap) return;
+                    window.currentResults = snap.results.slice();
+                    runCount = snap.runCountSnapshot;
+                    MAX_RUNS = snap.maxRunsSnapshot;
+                    updateCounter(counterEl, runCount, MAX_RUNS);
+                    showResultsSection();
+                    clearResultsTable();
+                    sortTable(currentSort, false);
+                    setupDownloadButton(window.currentResults || []);
+                    enableClearButton(snapshotLabel);
+                    const undoInline = document.getElementById(
+                      "undoInlineContainer"
+                    );
+                    if (undoInline) {
+                      undoInline.innerHTML = "";
+                      hide(undoInline);
+                    }
+                  },
+                },
+              ],
+              timeout: 6000,
+            });
+          }
+          try {
+            const undoInline = document.getElementById(
+              "undoInlineContainer"
+            );
+            if (undoInline) {
+              undoInline.innerHTML = "";
+              const btn = document.createElement("button");
+              btn.className = "btn btn-outline btn-small";
+              btn.innerHTML =
+                '<i class="fa-solid fa-rotate-left"></i><span>Hoàn tác xóa</span>';
+              btn.addEventListener("click", () => {
+                const snap = window.__lastClearedSnapshot;
+                if (!snap) return;
+                window.currentResults = snap.results.slice();
+                runCount = snap.runCountSnapshot;
+                MAX_RUNS = snap.maxRunsSnapshot;
+                updateCounter(counterEl, runCount, MAX_RUNS);
+                showResultsSection();
+                clearResultsTable();
+                sortTable(currentSort, false);
+                setupDownloadButton(window.currentResults || []);
+                enableClearButton(snapshotLabel);
+                undoInline.innerHTML = "";
+                hide(undoInline);
+              });
+              undoInline.appendChild(btn);
+              show(undoInline, "block");
+              setTimeout(() => {
+                if (undoInline && undoInline.firstChild) {
+                  undoInline.innerHTML = "";
+                  hide(undoInline);
+                }
+              }, 15000);
+            }
+          } catch (e) {}
+        } else {
+          if (Toasts)
+            Toasts.show("Bạn phải nhập đúng: Đồng Ý Xóa", {
+              type: "error",
+              title: "Chưa xác nhận",
+            });
+          input.focus();
+        }
+      };
+    };
+  }
+
+  function parseNumeric(value) {
+    if (value == null || value === "") return NaN;
+    const cleaned = String(value).trim().replace(/[^0-9.-]/g, "");
+    if (!cleaned) return NaN;
+    const parsed = Number(cleaned);
+    return Number.isFinite(parsed) ? parsed : NaN;
+  }
+
+  function buildCsvHeaderInfo(headerRow = []) {
+    const raw = Array.isArray(headerRow) ? headerRow : [];
+    const normalized = raw.map((cell) => String(cell ?? "").trim());
+    const lower = normalized.map((cell) => cell.toLowerCase());
+    const info = {
+      raw: normalized,
+      lower,
+      orderIdx: lower.findIndex((c) => c === "order" || c === "stt" || c === "#"),
+      noIdx: lower.findIndex((c) => c === "no" || c.includes("child no") || c.includes("số thứ tự")),
+      nameIdx: lower.findIndex(
+        (c) =>
+          c === "name" ||
+          c.includes("hotel name") ||
+          (c.includes("child") && c.includes("name"))
+      ),
+      addressIdx: lower.findIndex((c) => c.includes("address") || c.includes("địa chỉ")),
+      percentageIdx: lower.findIndex((c) => c.includes("percentage") || c.includes("%")),
+      statusIdx: lower.findIndex((c) => c === "status" || c.includes("trạng thái")),
+      fuzzyIdx: lower.findIndex((c) => c === "fuzzy" || c.includes("fuzzy score")),
+      linkIdxs: [],
+    };
+    lower.forEach((cell, idx) => {
+      if (!cell) return;
+      if (cell.startsWith("matched link") || (cell.includes("link") && !cell.includes("count"))) {
+        info.linkIdxs.push(idx);
+      }
+    });
+    if (!info.linkIdxs.length) {
+      for (let i = 6; i < normalized.length; i++) info.linkIdxs.push(i);
+    }
+    info.linkIdxs = Array.from(new Set(info.linkIdxs)).filter((i) => i >= 0).sort((a, b) => a - b);
+    return info;
+  }
+
+  function rowsToImportedResults(rows, headerInfo) {
+    const results = [];
+    const seenOrders = new Set();
+    let nextOrder = 1;
+    const allocateOrder = (rawOrder) => {
+      const candidate = Number.isFinite(rawOrder) ? Math.round(rawOrder) : NaN;
+      if (Number.isFinite(candidate) && candidate > 0 && !seenOrders.has(candidate)) {
+        seenOrders.add(candidate);
+        if (candidate >= nextOrder) nextOrder = candidate + 1;
+        return candidate;
+      }
+      while (seenOrders.has(nextOrder)) nextOrder++;
+      const assigned = nextOrder;
+      seenOrders.add(assigned);
+      nextOrder++;
+      return assigned;
+    };
+    rows.forEach((row, rowIndex) => {
+      const cells = Array.isArray(row) ? row : [];
+      const nameCell =
+        headerInfo.nameIdx !== -1 ? cells[headerInfo.nameIdx] : cells[4];
+      const addressCell =
+        headerInfo.addressIdx !== -1 ? cells[headerInfo.addressIdx] : cells[5];
+      const name = String(nameCell ?? "").trim();
+      const address = String(addressCell ?? "").trim();
+      if (!name && !address) return;
+      const orderRaw =
+        headerInfo.orderIdx !== -1 ? parseNumeric(cells[headerInfo.orderIdx]) : NaN;
+      const order = allocateOrder(orderRaw);
+      const hotelNoCell =
+        headerInfo.noIdx !== -1 ? cells[headerInfo.noIdx] : rowIndex + 1;
+      const percentageValue =
+        headerInfo.percentageIdx !== -1
+          ? parseNumeric(cells[headerInfo.percentageIdx])
+          : NaN;
+      const fuzzyValue =
+        headerInfo.fuzzyIdx !== -1 ? parseNumeric(cells[headerInfo.fuzzyIdx]) : NaN;
+      const statusRaw =
+        headerInfo.statusIdx !== -1 ? String(cells[headerInfo.statusIdx] ?? "").trim() : "";
+      const matchedLinks = [];
+      headerInfo.linkIdxs.forEach((idx) => {
+        if (idx >= cells.length) return;
+        const value = cells[idx];
+        if (value == null) return;
+        const url = String(value).trim();
+        if (!url) return;
+        matchedLinks.push({
+          url,
+          percentage: Number.isFinite(percentageValue) ? percentageValue : 0,
+          title: "",
+        });
+      });
+      const percentage = Number.isFinite(percentageValue)
+        ? Math.round(percentageValue)
+        : matchedLinks.length
+        ? 100
+        : 0;
+      results.push({
+        order,
+        hotelNo: String(hotelNoCell ?? "").trim() || String(rowIndex + 1),
+        hotelName: name,
+        hotelAddress: address,
+        matchedLinks,
+        percentage,
+        status: statusRaw || (matchedLinks.length ? "Matched" : "No match"),
+        fuzzy: Number.isFinite(fuzzyValue) ? fuzzyValue : null,
+      });
+    });
+    results.sort((a, b) => a.order - b.order);
+    return results;
+  }
+
+  function applyImportedResultsToUi(results, snapshotLabel = IMPORT_SNAPSHOT_LABEL) {
+    if (!Array.isArray(results) || !results.length) return [];
+    const prepared = results.map((row) => ({
+      ...row,
+      order: Number.isFinite(row.order) ? Math.round(row.order) : row.order,
+      hotelNo: String(row.hotelNo ?? "").trim(),
+      hotelName: String(row.hotelName ?? "").trim(),
+      hotelAddress: String(row.hotelAddress ?? "").trim(),
+      matchedLinks: (row.matchedLinks || []).map((link) => ({
+        url: String(link?.url ?? "").trim(),
+        percentage: Number.isFinite(link?.percentage) ? Number(link.percentage) : 0,
+        title: String(link?.title ?? "").trim(),
+      })),
+      percentage: Number.isFinite(row.percentage) ? Math.round(row.percentage) : 0,
+      status: String(row.status ?? "").trim() || "No match",
+      fuzzy:
+        row.fuzzy == null || row.fuzzy === ""
+          ? null
+          : Number.isFinite(Number(row.fuzzy))
+          ? Number(row.fuzzy)
+          : null,
+    }));
+    window.currentResults = prepared;
+    runCount = prepared.length;
+    MAX_RUNS = prepared.length;
+    currentPage = 1;
+    updateCounter(counterEl, runCount, MAX_RUNS || runCount);
+    showResultsSection();
+    clearResultsTable();
+    ensureNewestFirstOrdering();
+    setupDownloadButton(prepared);
+    enableClearButton(snapshotLabel);
+    const downloadBtn = document.getElementById("downloadCSVButton");
+    if (downloadBtn) show(downloadBtn, "inline-flex");
+    const spinnerEl = document.getElementById("spinner");
+    hide(spinnerEl);
+    const progressContainer = document.getElementById("progressContainer");
+    hide(progressContainer);
+    const pauseBtn = document.getElementById("pauseResumeButton");
+    hide(pauseBtn);
+    const stopBtn = document.getElementById("stopButton");
+    hide(stopBtn);
+    const resumeBadge = document.getElementById("resumeBadge");
+    hide(resumeBadge);
+    const resumeBtn = document.getElementById("resumeSessionButton");
+    hide(resumeBtn);
+    isPaused = false;
+    isProcessingRow = false;
+    shouldStop = false;
+    stoppedPermanently = false;
+    return prepared;
+  }
+
+  async function handleCsvImportFile(file) {
+    if (!file) return;
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      if (!workbook.SheetNames.length)
+        throw new Error("File CSV không có dữ liệu.");
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      if (!sheet) throw new Error("Không thể đọc dữ liệu CSV.");
+      let rows = XLSX.utils.sheet_to_json(sheet, {
+        header: 1,
+        blankrows: false,
+        defval: "",
+        raw: false,
+      });
+      rows = rows
+        .map((row) => (Array.isArray(row) ? row : []))
+        .filter((row) =>
+          row.some(
+            (cell) =>
+              cell !== null &&
+              cell !== undefined &&
+              String(cell).trim() !== ""
+          )
+        );
+      if (!rows.length) throw new Error("File CSV rỗng.");
+      const headerRow = rows.shift();
+      const headerInfo = buildCsvHeaderInfo(headerRow);
+      const results = rowsToImportedResults(rows, headerInfo);
+      if (!results.length)
+        throw new Error("Không tìm thấy dữ liệu hợp lệ trong file CSV.");
+      const prepared = applyImportedResultsToUi(results, IMPORT_SNAPSHOT_LABEL);
+      try {
+        localStorage.setItem("runCount", String(runCount));
+      } catch (e) {}
+      try {
+        const sessionPayload = {
+          results: prepared,
+          maxRuns: MAX_RUNS,
+          nextIndex: 0,
+          allRows: null,
+          source: "csvImport",
+          importedFile: file.name,
+          importedAt: new Date().toISOString(),
+        };
+        localStorage.setItem("tavily_session", JSON.stringify(sessionPayload));
+        localStorage.removeItem("tavily_stop_snapshot");
+        localStorage.removeItem("tavily_stopped_permanently");
+      } catch (e) {
+        console.warn("Không thể lưu phiên sau khi import CSV", e);
+      }
+      if (Toasts)
+        Toasts.show(`Đã import ${prepared.length} dòng từ CSV`, {
+          type: "success",
+          title: "Import CSV",
+        });
+    } catch (error) {
+      console.error("Import CSV thất bại", error);
+      const message = error?.message || "Không thể import CSV";
+      if (Toasts)
+        Toasts.show(message, {
+          type: "error",
+          title: "Import CSV",
+        });
+      else alert(message);
+    } finally {
+      if (importInputEl) importInputEl.value = "";
+    }
+  }
+
+  function restoreImportedResultsFromSession() {
+    try {
+      const saved = JSON.parse(localStorage.getItem("tavily_session") || "null");
+      if (
+        saved &&
+        saved.source === "csvImport" &&
+        Array.isArray(saved.results) &&
+        saved.results.length
+      ) {
+        applyImportedResultsToUi(saved.results, IMPORT_SNAPSHOT_LABEL);
+        try {
+          localStorage.setItem("runCount", String(runCount));
+        } catch (e) {}
+      }
+    } catch (e) {
+      console.warn("Không thể khôi phục dữ liệu import CSV", e);
+    }
+  }
   // If there's no saved session, clear any stale runCount so page doesn't show e.g. 10/0
   try {
     const s = localStorage.getItem("tavily_session");
@@ -556,6 +957,21 @@ document.addEventListener("DOMContentLoaded", function () {
       if (typeof initialFilter.select === "function") initialFilter.select();
     }
   } catch (e) {}
+
+  if (importButtonEl && importInputEl) {
+    importButtonEl.addEventListener("click", (evt) => {
+      evt.preventDefault();
+      importInputEl.value = "";
+      importInputEl.click();
+    });
+    importInputEl.addEventListener("change", async (evt) => {
+      const file = evt.target?.files && evt.target.files[0];
+      if (!file) return;
+      await handleCsvImportFile(file);
+    });
+  }
+
+  restoreImportedResultsFromSession();
 
   const searchBtnEl = document.getElementById("searchButton");
   if (searchBtnEl)
@@ -1032,140 +1448,7 @@ document.addEventListener("DOMContentLoaded", function () {
         updateCounter(counterEl, runCount, MAX_RUNS);
       } catch (e) {}
       setupDownloadButton(results);
-      if (clearBtn) {
-        show(clearBtn, "inline-flex");
-        clearBtn.onclick = () => {
-          // show modal
-          const modal = document.getElementById("confirmModal");
-          const input = document.getElementById("confirmInput");
-          const ok = document.getElementById("confirmOk");
-          const cancel = document.getElementById("confirmCancel");
-          if (!modal || !input || !ok || !cancel) return;
-          input.value = "";
-          show(modal, "flex");
-          input.focus();
-          const cleanup = () => {
-            hide(modal);
-            ok.onclick = null;
-            cancel.onclick = null;
-          };
-          cancel.onclick = () => {
-            cleanup();
-          };
-          ok.onclick = () => {
-            if (input.value === "Đồng Ý Xóa") {
-              // Snapshot for undo
-              window.__lastClearedSnapshot = {
-                results: (window.currentResults || []).slice(),
-                runCountSnapshot: runCount,
-                maxRunsSnapshot: MAX_RUNS,
-              };
-              // attempt include allRows from session for possible continue
-              let allRowsForSnap = null;
-              try {
-                const sess = JSON.parse(
-                  localStorage.getItem("tavily_session") || "null"
-                );
-                if (sess && Array.isArray(sess.allRows))
-                  allRowsForSnap = sess.allRows;
-              } catch (e) {}
-              addSnapshot("Clear", {
-                results: window.__lastClearedSnapshot.results,
-                runCount: runCount,
-                maxRuns: MAX_RUNS,
-                allRows: allRowsForSnap,
-              });
-              clearResultsTable();
-              window.currentResults = [];
-              hideResultsSection();
-              hide(clearBtn);
-              hide(downloadBtn);
-              try {
-                localStorage.removeItem("tavily_session");
-                localStorage.removeItem("runCount");
-                runCount = 0;
-                updateCounter(counterEl, 0, 0);
-                const resumeBtn = document.getElementById(
-                  "resumeSessionButton"
-                );
-                hide(resumeBtn);
-              } catch (e) {}
-              cleanup();
-              if (Toasts) {
-                Toasts.show("Đã xóa kết quả", {
-                  type: "success",
-                  title: "Xóa",
-                  actions: [
-                    {
-                      label: "Hoàn tác",
-                      onClick: () => {
-                        const snap = window.__lastClearedSnapshot;
-                        if (!snap) return;
-                        window.currentResults = snap.results.slice();
-                        runCount = snap.runCountSnapshot;
-                        MAX_RUNS = snap.maxRunsSnapshot;
-                        updateCounter(counterEl, runCount, MAX_RUNS);
-                        showResultsSection();
-                        clearResultsTable();
-                        sortTable(currentSort, false);
-                        const undoInline = document.getElementById(
-                          "undoInlineContainer"
-                        );
-                        if (undoInline) {
-                          undoInline.innerHTML = "";
-                          hide(undoInline);
-                        }
-                      },
-                    },
-                  ],
-                  timeout: 6000,
-                });
-              }
-              // Inline undo button
-              try {
-                const undoInline = document.getElementById(
-                  "undoInlineContainer"
-                );
-                if (undoInline) {
-                  undoInline.innerHTML = "";
-                  const btn = document.createElement("button");
-                  btn.className = "btn btn-outline btn-small";
-                  btn.innerHTML =
-                    '<i class="fa-solid fa-rotate-left"></i><span>Hoàn tác xóa</span>';
-                  btn.addEventListener("click", () => {
-                    const snap = window.__lastClearedSnapshot;
-                    if (!snap) return;
-                    window.currentResults = snap.results.slice();
-                    runCount = snap.runCountSnapshot;
-                    MAX_RUNS = snap.maxRunsSnapshot;
-                    updateCounter(counterEl, runCount, MAX_RUNS);
-                    showResultsSection();
-                    clearResultsTable();
-                    sortTable(currentSort, false);
-                    undoInline.innerHTML = "";
-                    hide(undoInline);
-                  });
-                  undoInline.appendChild(btn);
-                  show(undoInline, "block");
-                  setTimeout(() => {
-                    if (undoInline && undoInline.firstChild) {
-                      undoInline.innerHTML = "";
-                      hide(undoInline);
-                    }
-                  }, 15000);
-                }
-              } catch (e) {}
-            } else {
-              if (Toasts)
-                Toasts.show("Bạn phải nhập đúng: Đồng Ý Xóa", {
-                  type: "error",
-                  title: "Chưa xác nhận",
-                });
-              input.focus();
-            }
-          };
-        };
-      }
+      if (clearBtn) enableClearButton();
     } else {
       if (Toasts)
         Toasts.show("Không tìm thấy kết quả nào phù hợp", {
