@@ -1235,7 +1235,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const startTime = Date.now();
     for (let rowIndex = startIndex; rowIndex < jsonData.length; rowIndex++) {
       while (isPaused) {
-        await new Promise((r) => setTimeout(r, 200));
+        await new Promise((r) => setTimeout(r, 20000));
       }
       if (shouldStop) break;
       const row = jsonData[rowIndex];
