@@ -1265,7 +1265,9 @@ document.addEventListener("DOMContentLoaded", function () {
           : `/searchApiTavily?q=${encodeURIComponent(query)}`;
 
       let matchedLink = [];
-      try {
+        try {
+            await sleep(2000);
+			console.log("2s trên 1 request");
         const response = await axios.get(searchURL);
         const data = response.data;
         const resultsFromBrave = data.results;
@@ -2786,10 +2788,12 @@ window.addEventListener("load", () => {
     });
   }
 
-  function sleep(ms) {
-    return new Promise((resolve) => {
-      setTimeout(resolve, ms);
-    });
-  }
+
 
 });
+
+function sleep(ms) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}
