@@ -1266,7 +1266,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
       let matchedLink = [];
       try {
-        await sleep(2000);
         const response = await axios.get(searchURL);
         const data = response.data;
         const resultsFromBrave = data.results;
