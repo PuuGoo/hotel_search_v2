@@ -2787,7 +2787,7 @@ window.addEventListener("load", () => {
   }
 
   function sleep(ms) {
-    return new promise((resolve) => {
+    return new Promise((resolve) => {
       setTimeout(resolve, ms);
     });
   }
