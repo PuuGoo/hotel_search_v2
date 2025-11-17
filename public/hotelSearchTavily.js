@@ -1235,7 +1235,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const startTime = Date.now();
     for (let rowIndex = startIndex; rowIndex < jsonData.length; rowIndex++) {
       while (isPaused) {
-        await new Promise((r) => setTimeout(r, 20000));
+        await new Promise((r) => setTimeout(r, 200));
       }
       if (shouldStop) break;
       const row = jsonData[rowIndex];
@@ -1266,6 +1266,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       let matchedLink = [];
       try {
+        await sleep(20000);
         const response = await axios.get(searchURL);
         const data = response.data;
         const resultsFromBrave = data.results;
@@ -2785,4 +2786,11 @@ window.addEventListener("load", () => {
       }\">${v.toFixed(3)}</span>`;
     });
   }
+
+  function sleep(ms) {
+    return new promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
+  }
+
 });
