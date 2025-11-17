@@ -1662,11 +1662,18 @@ document.addEventListener("DOMContentLoaded", function () {
       const searchBtn = document.getElementById("searchButton");
       const spinnerEl = document.getElementById("spinner");
       const pauseBtn = document.getElementById("pauseResumeButton");
+      const stopBtn = document.getElementById("stopButton");
       if (searchBtn) searchBtn.disabled = true;
       show(spinnerEl, "flex");
       if (pauseBtn) {
         show(pauseBtn, "inline-flex");
         pauseBtn.textContent = "Tạm dừng";
+      }
+      // Hiển thị nút Dừng khi auto-resume
+      if (stopBtn) {
+        show(stopBtn, "inline-flex");
+        stopBtn.disabled = false;
+        stopBtn.innerHTML = '<i class="fa-solid fa-circle-stop"></i><span>Dừng</span>';
       }
 
       // Restore progress bar state on resume
@@ -1908,7 +1915,7 @@ document.addEventListener("DOMContentLoaded", function () {
             // Trigger processing of remaining rows asynchronously
             setTimeout(() => {
               try {
-                processRows(snap.allRows, snap.runCount || 0);
+                processRows(snap.allRows, snap.runRate || 0);
               } catch (e) {}
             }, 100);
           } catch (e) {
@@ -1919,21 +1926,6 @@ document.addEventListener("DOMContentLoaded", function () {
               });
           }
         }
-      });
-      // Rename via double-click
-      listEl.addEventListener("dblclick", (e) => {
-        const meta = e.target.closest(".snap-meta");
-        if (!meta) return;
-        const id = meta.getAttribute("data-id");
-        if (!id) return;
-        let arr = loadArchivedSnapshots();
-        const snap = arr.find((s) => s.id === id);
-        if (!snap) return;
-        const newName = prompt("Tên mới cho snapshot:", snap.label);
-        if (!newName) return;
-        snap.label = newName.trim().slice(0, 80) || snap.label;
-        saveArchivedSnapshots(arr);
-        refreshList();
       });
     }
     if (searchInput) {
@@ -2731,7 +2723,7 @@ window.addEventListener("load", () => {
   • Domain / path hiện <em>không cộng vào</em> vì đang chạy Title Only (hostPathScore = 0).<br/><br/>
   <strong>2. Override (đẩy điểm lên 1.000)</strong><br/>
   Nếu thỏa bất kỳ điều kiện sau, điểm = 1.000 và thêm flag tương ứng:<br/>
-  • <b>TITLE_PREFIX_MATCH</b>: Tiêu đề (sau khi bỏ hậu tố brand như “- Agoda”) trùng hoặc bắt đầu bằng tên khách sạn.<br/>
+  • <b>TITLE_PREFIX_MATCH</b>: Tiêu đề (sau khi bỏ “- Agoda”) trùng hoặc bắt đầu bằng tên khách sạn.<br/>
   • <b>TOKEN_SEQUENCE_MATCH</b>: Toàn bộ token tên khách sạn xuất hiện tuần tự trong tiêu đề (có thể xen thêm từ phụ).<br/>
   • <b>TOKEN_PERMUTATION_MATCH</b>: Tập token tên khách sạn (bỏ các từ chung: hotel, resort, the...) đều xuất hiện trong tiêu đề, thứ tự bất kỳ, cho phép dư token phụ.<br/><br/>
   <strong>3. Các cờ (Flags) khác</strong><br/>
