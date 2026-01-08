@@ -1311,8 +1311,9 @@ document.addEventListener("DOMContentLoaded", function () {
             )
             .sort((a, b) => {
               const getPriority = (link) => {
-                if (link.includes("agoda")) return 2;
+                if (link.includes("trip")) return 2;
                 if (link.includes("booking")) return 3;
+                if (link.includes("hotels")) return 4;
                 return 18;
               };
               return getPriority(a.matchedLink) - getPriority(b.matchedLink);
