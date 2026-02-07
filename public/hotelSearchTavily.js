@@ -1266,7 +1266,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       let matchedLink = [];
         try {
-            await sleep(1500);
+            await sleep(1000);
 			console.log("2s trên 1 request");
         const response = await axios.get(searchURL);
         const data = response.data;
