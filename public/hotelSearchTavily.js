@@ -1307,7 +1307,7 @@ document.addEventListener("DOMContentLoaded", function () {
               (row) =>
                 row.percentage == maxPercentageResult.percentage &&
                 !row.matchedLink.includes("tripadvisor") &&
-                !row.matchedLink.includes("makemytrip")
+                !row.matchedLink.includes("guestreservations")
             )
             .sort((a, b) => {
               const getPriority = (link) => {
