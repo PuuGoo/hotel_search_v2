@@ -13,6 +13,7 @@ dotenv.config();
 import cors from "cors";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { tavily } from "@tavily/core";
+import multer from "multer";
 
 // Get the directory name from import.meta.url
 const __filename = fileURLToPath(import.meta.url);
@@ -20,16 +21,26 @@ const __dirname = dirname(__filename);
 
 // Khởi tạo ứng dụng
 const app = express(); // App biến đại diện cho ứng dụng Express
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
+const CASE12_API_URL =
+  process.env.CASE12_API_URL || "https://hotel-search-v2-api.vercel.app/api/case12";
 
 // ⚠️ Đặt proxy TRƯỚC khi dùng static
-app.use(
-  "/api",
-  createProxyMiddleware({
-    target: "http://localhost:8080",
-    changeOrigin: true,
-    pathRewrite: { "^/api": "" }, // /api/search => /search
-  })
-);
+const defaultApiProxy = createProxyMiddleware({
+  target: "http://localhost:8080",
+  changeOrigin: true,
+  pathRewrite: { "^/api": "" }, // /api/search => /search
+});
+
+app.use("/api", (req, res, next) => {
+  if (req.path === "/case12" || req.path === "/case12/health") {
+    return next();
+  }
+  return defaultApiProxy(req, res, next);
+});
 
 app.use(bodyParser.json()); // Middleware giúp xử lý các request với dữ liệu JSON
 app.use(bodyParser.urlencoded({ extended: true })); // Middleware xử lý dữ liệu URL-encoded từ các form HTML
@@ -236,6 +247,66 @@ async function searchWithRetryGo(query) {
 
   throw new Error("Không thể thực hiện tìm kiếm sau khi thử tất cả API key.");
 }
+
+app.get("/api/case12/health", async (req, res) => {
+  try {
+    const response = await fetch(CASE12_API_URL);
+    const body = await response.text();
+    return res.status(response.status).type("application/json").send(body);
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      error: "Không kết nối được Case12 API",
+      details: error.message,
+    });
+  }
+});
+
+app.post("/api/case12", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "Thiếu file upload (field name: file)" });
+    }
+
+    const formData = new FormData();
+    const fileBlob = new Blob([req.file.buffer], {
+      type:
+        req.file.mimetype ||
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    formData.append("file", fileBlob, req.file.originalname || "input.xlsx");
+
+    const response = await fetch(CASE12_API_URL, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).send(errorText);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const contentType =
+      response.headers.get("content-type") ||
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const disposition =
+      response.headers.get("content-disposition") ||
+      'attachment; filename="verified_case12.xlsx"';
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", disposition);
+    return res.send(Buffer.from(arrayBuffer));
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      error: "Lỗi khi gọi Case12 API",
+      details: error.message,
+    });
+  }
+});
 
 // Định tuyến cho trang đăng nhập
 app.get("/", (req, res) => {
