@@ -13,6 +13,19 @@ const resultDetailState = {
   elements: null,
   ensureVisible: null,
 };
+let case12DownloadObjectUrl = "";
+
+function getFileNameFromDisposition(dispositionValue, fallback = "verified_case12.xlsx") {
+  if (!dispositionValue) return fallback;
+  const match = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(dispositionValue);
+  const encoded = match ? match[1] || match[2] : "";
+  if (!encoded) return fallback;
+  try {
+    return decodeURIComponent(encoded);
+  } catch (e) {
+    return encoded;
+  }
+}
 
 function getResultDetailElements() {
   if (resultDetailState.elements) return resultDetailState.elements;
@@ -40,6 +53,128 @@ function getResultDetailElements() {
   };
   return resultDetailState.elements;
 }
+
+  const case12FileInput = document.getElementById("case12FileInput");
+  const case12PickButton = document.getElementById("case12PickFileButton");
+  const case12RunButton = document.getElementById("case12RunButton");
+  const case12Status = document.getElementById("case12Status");
+  const case12FileName = document.getElementById("case12FileName");
+  const case12DownloadLink = document.getElementById("case12DownloadLink");
+
+  function setCase12Status(text, kind = "normal") {
+    if (!case12Status) return;
+    case12Status.textContent = text;
+    if (kind === "error") {
+      case12Status.style.color = "#ff9c9c";
+    } else if (kind === "success") {
+      case12Status.style.color = "#9df3c4";
+    } else {
+      case12Status.style.color = "";
+    }
+  }
+
+  function setCase12FileNameText(nameText) {
+    if (!case12FileName) return;
+    case12FileName.textContent = nameText || "Chưa chọn file";
+  }
+
+  function resetCase12DownloadLink() {
+    if (case12DownloadObjectUrl) {
+      URL.revokeObjectURL(case12DownloadObjectUrl);
+      case12DownloadObjectUrl = "";
+    }
+    if (case12DownloadLink) {
+      case12DownloadLink.classList.add("hidden");
+      case12DownloadLink.removeAttribute("href");
+      case12DownloadLink.setAttribute("download", "verified_case12.xlsx");
+    }
+  }
+
+  if (case12PickButton && case12FileInput) {
+    case12PickButton.addEventListener("click", () => case12FileInput.click());
+  }
+
+  if (case12FileInput) {
+    case12FileInput.addEventListener("change", () => {
+      const f = case12FileInput.files && case12FileInput.files[0];
+      if (!f) {
+        setCase12FileNameText("Chưa chọn file");
+        resetCase12DownloadLink();
+        return;
+      }
+      setCase12FileNameText(f.name);
+      setCase12Status("Đã chọn file, sẵn sàng gửi API");
+      resetCase12DownloadLink();
+    });
+  }
+
+  if (case12RunButton) {
+    case12RunButton.addEventListener("click", async () => {
+      try {
+        const selectedFile = case12FileInput?.files?.[0];
+        if (!selectedFile) {
+          setCase12Status("Vui lòng chọn file Excel", "error");
+          if (Toasts) {
+            Toasts.show("Vui lòng chọn file Excel cho chức năng 1 API", {
+              type: "error",
+              title: "Thiếu file",
+            });
+          }
+          return;
+        }
+
+        case12RunButton.disabled = true;
+        setCase12Status("Đang gửi file lên API...");
+
+        const fd = new FormData();
+        fd.append("file", selectedFile);
+
+        const response = await fetch("/api/case12", {
+          method: "POST",
+          body: fd,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || `API lỗi (${response.status})`);
+        }
+
+        const blob = await response.blob();
+        const fileName = getFileNameFromDisposition(
+          response.headers.get("content-disposition"),
+          "verified_case12.xlsx"
+        );
+
+        resetCase12DownloadLink();
+        case12DownloadObjectUrl = URL.createObjectURL(blob);
+
+        if (case12DownloadLink) {
+          case12DownloadLink.href = case12DownloadObjectUrl;
+          case12DownloadLink.setAttribute("download", fileName);
+          case12DownloadLink.classList.remove("hidden");
+        }
+
+        setCase12Status("Xử lý thành công, nhấn 'Tải lại kết quả' để tải file", "success");
+        if (Toasts) {
+          Toasts.show("API chức năng 1 xử lý thành công", {
+            type: "success",
+            title: "Case 1-2 API",
+          });
+        }
+      } catch (error) {
+        console.error("Case12 API failed", error);
+        setCase12Status("Lỗi API: " + (error?.message || "Unknown"), "error");
+        if (Toasts) {
+          Toasts.show(error?.message || "Gọi API thất bại", {
+            type: "error",
+            title: "Case 1-2 API",
+          });
+        }
+      } finally {
+        case12RunButton.disabled = false;
+      }
+    });
+  }
 
 function getSortedOrdersAsc() {
   const results = Array.isArray(window.currentResults)

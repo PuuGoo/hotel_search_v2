@@ -346,6 +346,72 @@
             ></div>
           </div>
         </div>
+
+        <div
+          class="glass-card"
+          role="region"
+          aria-labelledby="case12ApiSectionTitle"
+          style="margin-top: var(--spacing-md)"
+        >
+          <div class="card-header" id="case12ApiSectionTitle">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Chức năng 1 API (Case
+            1-2 / Chain-Branch / VHO / Check URL không Chrome)
+          </div>
+          <div class="form-row">
+            <div class="form-col">
+              <label for="case12FileInput">Tệp Excel đầu vào</label>
+              <div class="flex gap-sm wrap" style="align-items: center">
+                <input
+                  id="case12FileInput"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  style="display: none"
+                />
+                <button
+                  id="case12PickFileButton"
+                  type="button"
+                  class="btn btn-outline btn-small"
+                >
+                  <i class="fa-solid fa-file-arrow-up"></i
+                  ><span>Chọn file API</span>
+                </button>
+                <span
+                  id="case12FileName"
+                  class="text-tertiary"
+                  style="font-size: 0.68rem"
+                  >Chưa chọn file</span
+                >
+              </div>
+            </div>
+            <div class="form-col" style="max-width: 340px">
+              <label>Trạng thái API</label>
+              <div
+                id="case12Status"
+                class="badge"
+                style="background: rgba(255, 255, 255, 0.1)"
+              >
+                Sẵn sàng
+              </div>
+            </div>
+          </div>
+          <div class="flex gap-sm wrap" style="margin-top: var(--spacing-sm)">
+            <button
+              id="case12RunButton"
+              type="button"
+              class="btn btn-accent btn-modern"
+              style="flex: 1"
+            >
+              <i class="fa-solid fa-paper-plane"></i
+              ><span>Gửi file tới API chức năng 1</span>
+            </button>
+            <a
+              id="case12DownloadLink"
+              class="btn btn-outline btn-small hidden"
+              download="verified_case12.xlsx"
+              ><i class="fa-solid fa-download"></i><span>Tải lại kết quả</span></a
+            >
+          </div>
+        </div>
       </section>
       <!-- Modal: Snapshot Archive -->
       <div
